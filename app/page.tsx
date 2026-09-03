@@ -39,7 +39,10 @@ interface DepthSlot {
   eligiblePositions: string[];
 }
 
-type DepthChartTab = 'offense' | 'defense' | 'special-teams';
+type DepthChartTab =
+  | 'offense'
+  | 'defense'
+  | 'special-teams';
 
 type DepthAssignments = Record<string, number[]>;
 
@@ -209,13 +212,22 @@ export default function RosterDashboard() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [schedule, setSchedule] = useState<Game[]>([]);
 
-  const [selectedPosition, setSelectedPosition] = useState('ALL');
+  const [selectedPosition, setSelectedPosition] =
+    useState('ALL');
+
   const [search, setSearch] = useState('');
 
-  const [sortBy, setSortBy] = useState<'number' | 'name'>('number');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<
+    'number' | 'name'
+  >('number');
 
-  const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
+  const [sortOrder, setSortOrder] = useState<
+    'asc' | 'desc'
+  >('asc');
+
+  const [editingNotesId, setEditingNotesId] =
+    useState<number | null>(null);
+
   const [tempNotes, setTempNotes] = useState('');
 
   const [depthChartTab, setDepthChartTab] =
@@ -263,7 +275,10 @@ export default function RosterDashboard() {
       .order('number', { ascending: true });
 
     if (error) {
-      console.error('Error fetching players:', error);
+      console.error(
+        'Error fetching players:',
+        error
+      );
       return;
     }
 
@@ -277,7 +292,10 @@ export default function RosterDashboard() {
       .order('id', { ascending: true });
 
     if (error) {
-      console.error('Error fetching staff:', error);
+      console.error(
+        'Error fetching staff:',
+        error
+      );
       return;
     }
 
@@ -291,7 +309,10 @@ export default function RosterDashboard() {
       .order('Date', { ascending: true });
 
     if (error) {
-      console.error('Error fetching schedule:', error);
+      console.error(
+        'Error fetching schedule:',
+        error
+      );
       return;
     }
 
@@ -305,14 +326,20 @@ export default function RosterDashboard() {
       .eq('id', id);
 
     if (error) {
-      console.error('Error saving notes:', error);
+      console.error(
+        'Error saving notes:',
+        error
+      );
       return;
     }
 
     setPlayers((currentPlayers) =>
       currentPlayers.map((player) =>
         player.id === id
-          ? { ...player, notes: tempNotes }
+          ? {
+              ...player,
+              notes: tempNotes,
+            }
           : player
       )
     );
@@ -320,10 +347,14 @@ export default function RosterDashboard() {
     setEditingNotesId(null);
   }
 
-  function handleSortToggle(field: 'number' | 'name') {
+  function handleSortToggle(
+    field: 'number' | 'name'
+  ) {
     if (sortBy === field) {
       setSortOrder((currentOrder) =>
-        currentOrder === 'asc' ? 'desc' : 'asc'
+        currentOrder === 'asc'
+          ? 'desc'
+          : 'asc'
       );
     } else {
       setSortBy(field);
@@ -341,9 +372,13 @@ export default function RosterDashboard() {
         player.name
           .toLowerCase()
           .includes(search.toLowerCase()) ||
-        player.number.toString().includes(search);
+        player.number
+          .toString()
+          .includes(search);
 
-      return matchesPosition && matchesSearch;
+      return (
+        matchesPosition && matchesSearch
+      );
     })
     .sort((a, b) => {
       let comparison = 0;
@@ -351,7 +386,8 @@ export default function RosterDashboard() {
       if (sortBy === 'number') {
         comparison = a.number - b.number;
       } else {
-        comparison = a.name.localeCompare(b.name);
+        comparison =
+          a.name.localeCompare(b.name);
       }
 
       return sortOrder === 'asc'
@@ -378,23 +414,28 @@ export default function RosterDashboard() {
       players.map((player) => player.id)
     );
 
-    let saved: DepthAssignments | null = null;
+    let saved: DepthAssignments | null =
+      null;
 
     if (typeof window !== 'undefined') {
       try {
-        const stored = window.localStorage.getItem(
-          'psu-football-depth-chart-v2'
-        );
+        const stored =
+          window.localStorage.getItem(
+            'psu-football-depth-chart-v2'
+          );
 
         if (stored) {
-          const parsed = JSON.parse(stored);
+          const parsed = JSON.parse(
+            stored
+          );
 
           if (
             parsed &&
             typeof parsed === 'object' &&
             !Array.isArray(parsed)
           ) {
-            saved = parsed as DepthAssignments;
+            saved =
+              parsed as DepthAssignments;
           }
         }
       } catch (error) {
@@ -409,7 +450,8 @@ export default function RosterDashboard() {
 
     ALL_DEPTH_SLOTS.forEach((slot) => {
       const ids: number[] =
-        saved && Array.isArray(saved[slot.id])
+        saved &&
+        Array.isArray(saved[slot.id])
           ? saved[slot.id]
           : [];
 
@@ -424,9 +466,11 @@ export default function RosterDashboard() {
       Object.values(cleaned).flat()
     );
 
-    const unassignedPlayers = players.filter(
-      (player) => !assignedIds.has(player.id)
-    );
+    const unassignedPlayers =
+      players.filter(
+        (player) =>
+          !assignedIds.has(player.id)
+      );
 
     const addToSlot = (
       slotId: string,
@@ -436,8 +480,15 @@ export default function RosterDashboard() {
         cleaned[slotId] = [];
       }
 
-      if (!cleaned[slotId].includes(player.id)) {
-        cleaned[slotId].push(player.id);
+      if (
+        !cleaned[slotId].includes(
+          player.id
+        )
+      ) {
+        cleaned[slotId].push(
+          player.id
+        );
+
         assignedIds.add(player.id);
       }
     };
@@ -449,37 +500,63 @@ export default function RosterDashboard() {
       const availablePlayers =
         unassignedPlayers.filter(
           (player) =>
-            player.position === playerPosition &&
-            !assignedIds.has(player.id)
+            player.position ===
+              playerPosition &&
+            !assignedIds.has(
+              player.id
+            )
         );
 
-      availablePlayers.forEach((player, index) => {
-        const slotId =
-          slotIds[index % slotIds.length];
+      availablePlayers.forEach(
+        (player, index) => {
+          const slotId =
+            slotIds[
+              index % slotIds.length
+            ];
 
-        addToSlot(slotId, player);
-      });
+          addToSlot(
+            slotId,
+            player
+          );
+        }
+      );
     };
 
     addPlayersToSlots('QB', ['QB']);
     addPlayersToSlots('RB', ['RB']);
-    addPlayersToSlots('WR', ['X', 'Y', 'Z']);
+
+    addPlayersToSlots(
+      'WR',
+      ['X', 'Y', 'Z']
+    );
+
     addPlayersToSlots('TE', ['TE']);
+
     addPlayersToSlots(
       'OL',
       ['OT', 'G1', 'C', 'G2', 'T']
     );
 
-    addPlayersToSlots('DE', ['DE1', 'DE2']);
-    addPlayersToSlots('DT', ['DT1', 'DT2']);
+    addPlayersToSlots(
+      'DE',
+      ['DE1', 'DE2']
+    );
+
+    addPlayersToSlots(
+      'DT',
+      ['DT1', 'DT2']
+    );
+
     addPlayersToSlots(
       'LB',
       ['WILL', 'MIKE', 'SAM']
     );
+
     addPlayersToSlots(
       'CB',
       ['CB', 'NICKLE']
     );
+
     addPlayersToSlots(
       'S',
       ['SS', 'FS', 'NICKLE']
@@ -535,14 +612,21 @@ export default function RosterDashboard() {
       ];
     }
 
-    const assignedPlayerIds = new Set(
-      Object.values(depthAssignments).flat()
-    );
+    const assignedPlayerIds =
+      new Set(
+        Object.values(
+          depthAssignments
+        ).flat()
+      );
 
     return players.filter(
       (player) =>
-        positionPool.includes(player.position) &&
-        !assignedPlayerIds.has(player.id)
+        positionPool.includes(
+          player.position
+        ) &&
+        !assignedPlayerIds.has(
+          player.id
+        )
     );
   }
 
@@ -550,7 +634,8 @@ export default function RosterDashboard() {
     playerId: number
   ): Player | undefined {
     return players.find(
-      (player) => player.id === playerId
+      (player) =>
+        player.id === playerId
     );
   }
 
@@ -567,12 +652,15 @@ export default function RosterDashboard() {
     playerId: number,
     assignments: DepthAssignments
   ) {
-    Object.keys(assignments).forEach((slotId) => {
-      assignments[slotId] =
-        assignments[slotId].filter(
-          (id) => id !== playerId
-        );
-    });
+    Object.keys(assignments).forEach(
+      (slotId) => {
+        assignments[slotId] =
+          assignments[slotId].filter(
+            (id) =>
+              id !== playerId
+          );
+      }
+    );
   }
 
   function movePlayerToSlot(
@@ -580,70 +668,105 @@ export default function RosterDashboard() {
     slotId: string,
     targetIndex?: number
   ) {
-    const slot = ALL_DEPTH_SLOTS.find(
-      (item) => item.id === slotId
-    );
+    const slot =
+      ALL_DEPTH_SLOTS.find(
+        (item) =>
+          item.id === slotId
+      );
 
-    const player = getPlayerById(playerId);
+    const player =
+      getPlayerById(playerId);
 
     if (!slot || !player) {
       return;
     }
 
-    if (!playerCanEnterSlot(player, slot)) {
+    if (
+      !playerCanEnterSlot(
+        player,
+        slot
+      )
+    ) {
       return;
     }
 
-    setDepthAssignments((currentAssignments) => {
-      const nextAssignments: DepthAssignments = {};
+    setDepthAssignments(
+      (currentAssignments) => {
+        const nextAssignments: DepthAssignments =
+          {};
 
-      Object.keys(currentAssignments).forEach(
-        (key) => {
+        Object.keys(
+          currentAssignments
+        ).forEach((key) => {
           nextAssignments[key] = [
-            ...(currentAssignments[key] || []),
+            ...(currentAssignments[
+              key
+            ] || []),
           ];
-        }
-      );
+        });
 
-      ALL_DEPTH_SLOTS.forEach((item) => {
-        if (!nextAssignments[item.id]) {
-          nextAssignments[item.id] = [];
-        }
-      });
+        ALL_DEPTH_SLOTS.forEach(
+          (item) => {
+            if (
+              !nextAssignments[
+                item.id
+              ]
+            ) {
+              nextAssignments[
+                item.id
+              ] = [];
+            }
+          }
+        );
 
-      removePlayerFromAllSlots(
-        playerId,
-        nextAssignments
-      );
+        removePlayerFromAllSlots(
+          playerId,
+          nextAssignments
+        );
 
-      const destination =
-        nextAssignments[slotId] || [];
+        const destination =
+          nextAssignments[
+            slotId
+          ] || [];
 
-      const insertAt =
-        typeof targetIndex === 'number'
-          ? Math.max(
-              0,
-              Math.min(
-                targetIndex,
-                destination.length
+        const insertAt =
+          typeof targetIndex ===
+          'number'
+            ? Math.max(
+                0,
+                Math.min(
+                  targetIndex,
+                  destination.length
+                )
               )
-            )
-          : destination.length;
+            : destination.length;
 
-      destination.splice(insertAt, 0, playerId);
+        destination.splice(
+          insertAt,
+          0,
+          playerId
+        );
 
-      nextAssignments[slotId] = destination;
+        nextAssignments[
+          slotId
+        ] = destination;
 
-      return nextAssignments;
-    });
+        return nextAssignments;
+      }
+    );
   }
 
   function handleDragStart(
     playerId: number,
     fromSlot: string | null
   ) {
-    setDraggedPlayerId(playerId);
-    setDraggedFromSlot(fromSlot);
+    setDraggedPlayerId(
+      playerId
+    );
+
+    setDraggedFromSlot(
+      fromSlot
+    );
   }
 
   function handleDragEnd() {
@@ -657,7 +780,9 @@ export default function RosterDashboard() {
   ) {
     event.preventDefault();
 
-    if (draggedPlayerId === null) {
+    if (
+      draggedPlayerId === null
+    ) {
       return;
     }
 
@@ -677,7 +802,9 @@ export default function RosterDashboard() {
     event.preventDefault();
     event.stopPropagation();
 
-    if (draggedPlayerId === null) {
+    if (
+      draggedPlayerId === null
+    ) {
       return;
     }
 
@@ -701,6 +828,7 @@ export default function RosterDashboard() {
         draggable
         onDragStart={(event) => {
           event.stopPropagation();
+
           handleDragStart(
             player.id,
             fromSlot
@@ -712,7 +840,8 @@ export default function RosterDashboard() {
             ? 'p-3'
             : 'p-4'
         } ${
-          draggedPlayerId === player.id
+          draggedPlayerId ===
+          player.id
             ? 'opacity-40'
             : ''
         }`}
@@ -747,7 +876,9 @@ export default function RosterDashboard() {
     slot: DepthSlot
   ) {
     const assignedIds =
-      depthAssignments[slot.id] || [];
+      depthAssignments[
+        slot.id
+      ] || [];
 
     return (
       <div
@@ -775,20 +906,28 @@ export default function RosterDashboard() {
           </div>
 
           <div className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            {slot.eligiblePositions.join(' / ')}
+            {slot.eligiblePositions.join(
+              ' / '
+            )}
           </div>
         </div>
 
         <div className="space-y-2">
-          {assignedIds.length === 0 ? (
+          {assignedIds.length ===
+          0 ? (
             <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-5 text-center text-xs text-slate-600">
               Drag player here
             </div>
           ) : (
             assignedIds.map(
-              (playerId, index) => {
+              (
+                playerId,
+                index
+              ) => {
                 const player =
-                  getPlayerById(playerId);
+                  getPlayerById(
+                    playerId
+                  );
 
                 if (!player) {
                   return null;
@@ -797,7 +936,9 @@ export default function RosterDashboard() {
                 return (
                   <div
                     key={`${slot.id}-${player.id}`}
-                    onDragOver={(event) => {
+                    onDragOver={(
+                      event
+                    ) => {
                       event.preventDefault();
                     }}
                     onDrop={(event) =>
@@ -809,11 +950,14 @@ export default function RosterDashboard() {
                     }
                   >
                     <div className="mb-1 ml-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      {index === 0
+                      {index ===
+                      0
                         ? '1st String'
-                        : index === 1
+                        : index ===
+                          1
                           ? '2nd String'
-                          : index === 2
+                          : index ===
+                            2
                             ? '3rd String'
                             : `${index + 1}th String`}
                     </div>
@@ -835,7 +979,8 @@ export default function RosterDashboard() {
 
   function resetDepthChart() {
     if (
-      typeof window !== 'undefined'
+      typeof window !==
+      'undefined'
     ) {
       window.localStorage.removeItem(
         'psu-football-depth-chart-v2'
@@ -847,7 +992,9 @@ export default function RosterDashboard() {
 
   function renderDepthChart() {
     const slots =
-      getSlotsForTab(depthChartTab);
+      getSlotsForTab(
+        depthChartTab
+      );
 
     const availablePlayers =
       getDepthChartPlayers(
@@ -872,14 +1019,17 @@ export default function RosterDashboard() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-400">
-                Drag players into position
-                groups and arrange them by
+                Drag players into
+                position groups and
+                arrange them by
                 string.
               </p>
             </div>
 
             <button
-              onClick={resetDepthChart}
+              onClick={
+                resetDepthChart
+              }
               className="rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/20"
             >
               Reset Depth Chart
@@ -945,8 +1095,9 @@ export default function RosterDashboard() {
               </h3>
 
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Players disappear from this
-                list once assigned to a
+                Players disappear
+                from this list once
+                assigned to a
                 position.
               </p>
             </div>
@@ -955,8 +1106,9 @@ export default function RosterDashboard() {
               {availablePlayers.length ===
               0 ? (
                 <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-6 text-center text-xs text-slate-600">
-                  All eligible players
-                  are assigned.
+                  All eligible
+                  players are
+                  assigned.
                 </div>
               ) : (
                 availablePlayers.map(
@@ -973,7 +1125,9 @@ export default function RosterDashboard() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {slots.map((slot) =>
-              renderDepthSlot(slot)
+              renderDepthSlot(
+                slot
+              )
             )}
           </div>
         </div>
@@ -984,17 +1138,26 @@ export default function RosterDashboard() {
   function renderPositionEditor(
     position: string
   ) {
-    let relevantSlots: DepthSlot[] = [];
+    let relevantSlots: DepthSlot[] =
+      [];
 
     if (position === 'QB') {
-      relevantSlots = OFFENSE_SLOTS.filter(
-        (slot) => slot.id === 'QB'
-      );
-    } else if (position === 'RB') {
-      relevantSlots = OFFENSE_SLOTS.filter(
-        (slot) => slot.id === 'RB'
-      );
-    } else if (position === 'WR') {
+      relevantSlots =
+        OFFENSE_SLOTS.filter(
+          (slot) =>
+            slot.id === 'QB'
+        );
+    } else if (
+      position === 'RB'
+    ) {
+      relevantSlots =
+        OFFENSE_SLOTS.filter(
+          (slot) =>
+            slot.id === 'RB'
+        );
+    } else if (
+      position === 'WR'
+    ) {
       relevantSlots =
         OFFENSE_SLOTS.filter(
           (slot) =>
@@ -1002,11 +1165,17 @@ export default function RosterDashboard() {
               'WR'
             )
         );
-    } else if (position === 'TE') {
-      relevantSlots = OFFENSE_SLOTS.filter(
-        (slot) => slot.id === 'TE'
-      );
-    } else if (position === 'OL') {
+    } else if (
+      position === 'TE'
+    ) {
+      relevantSlots =
+        OFFENSE_SLOTS.filter(
+          (slot) =>
+            slot.id === 'TE'
+        );
+    } else if (
+      position === 'OL'
+    ) {
       relevantSlots =
         OFFENSE_SLOTS.filter(
           (slot) =>
@@ -1014,7 +1183,9 @@ export default function RosterDashboard() {
               'OL'
             )
         );
-    } else if (position === 'DE') {
+    } else if (
+      position === 'DE'
+    ) {
       relevantSlots =
         DEFENSE_SLOTS.filter(
           (slot) =>
@@ -1022,7 +1193,9 @@ export default function RosterDashboard() {
               'DE'
             )
         );
-    } else if (position === 'DT') {
+    } else if (
+      position === 'DT'
+    ) {
       relevantSlots =
         DEFENSE_SLOTS.filter(
           (slot) =>
@@ -1030,7 +1203,9 @@ export default function RosterDashboard() {
               'DT'
             )
         );
-    } else if (position === 'LB') {
+    } else if (
+      position === 'LB'
+    ) {
       relevantSlots =
         DEFENSE_SLOTS.filter(
           (slot) =>
@@ -1038,7 +1213,9 @@ export default function RosterDashboard() {
               'LB'
             )
         );
-    } else if (position === 'CB') {
+    } else if (
+      position === 'CB'
+    ) {
       relevantSlots =
         DEFENSE_SLOTS.filter(
           (slot) =>
@@ -1046,7 +1223,9 @@ export default function RosterDashboard() {
               'CB'
             )
         );
-    } else if (position === 'S') {
+    } else if (
+      position === 'S'
+    ) {
       relevantSlots =
         DEFENSE_SLOTS.filter(
           (slot) =>
@@ -1054,24 +1233,37 @@ export default function RosterDashboard() {
               'S'
             )
         );
-    } else if (position === 'K') {
-      relevantSlots = SPECIAL_TEAMS_SLOTS.filter(
-        (slot) => slot.id === 'K'
-      );
-    } else if (position === 'P') {
-      relevantSlots = SPECIAL_TEAMS_SLOTS.filter(
-        (slot) => slot.id === 'P'
-      );
-    } else if (position === 'LS') {
-      relevantSlots = SPECIAL_TEAMS_SLOTS.filter(
-        (slot) => slot.id === 'LS'
-      );
+    } else if (
+      position === 'K'
+    ) {
+      relevantSlots =
+        SPECIAL_TEAMS_SLOTS.filter(
+          (slot) =>
+            slot.id === 'K'
+        );
+    } else if (
+      position === 'P'
+    ) {
+      relevantSlots =
+        SPECIAL_TEAMS_SLOTS.filter(
+          (slot) =>
+            slot.id === 'P'
+        );
+    } else if (
+      position === 'LS'
+    ) {
+      relevantSlots =
+        SPECIAL_TEAMS_SLOTS.filter(
+          (slot) =>
+            slot.id === 'LS'
+        );
     }
 
     const positionPlayers =
       players.filter(
         (player) =>
-          player.position === position
+          player.position ===
+          position
       );
 
     const assignedToRelevantSlots =
@@ -1098,12 +1290,14 @@ export default function RosterDashboard() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-bold text-white">
-                {position} Depth Chart
+                {position} Depth
+                Chart
               </h2>
 
               <p className="text-sm text-slate-400">
-                Drag players into the
-                appropriate role.
+                Drag players into
+                the appropriate
+                role.
               </p>
             </div>
 
@@ -1122,7 +1316,8 @@ export default function RosterDashboard() {
               </h3>
 
               <p className="mt-1 text-xs text-slate-500">
-                Drag a player into a role.
+                Drag a player into
+                a role.
               </p>
             </div>
 
@@ -1130,7 +1325,8 @@ export default function RosterDashboard() {
               {availablePlayers.length ===
               0 ? (
                 <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-6 text-center text-xs text-slate-600">
-                  All players assigned.
+                  All players
+                  assigned.
                 </div>
               ) : (
                 availablePlayers.map(
@@ -1146,8 +1342,11 @@ export default function RosterDashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {relevantSlots.map((slot) =>
-              renderDepthSlot(slot)
+            {relevantSlots.map(
+              (slot) =>
+                renderDepthSlot(
+                  slot
+                )
             )}
           </div>
         </div>
@@ -1159,13 +1358,15 @@ export default function RosterDashboard() {
     <div className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
       <header className="mx-auto mb-8 max-w-7xl">
         <h1 className="mb-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          2026 Football Dashboard
+          2026 Football
+          Dashboard
         </h1>
 
         <p className="max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-          Manage player roster, scouting
-          notes, coaching personnel,
-          schedule, and depth chart.
+          Manage player roster,
+          scouting notes, coaching
+          personnel, schedule, and
+          depth chart.
         </p>
       </header>
 
@@ -1173,10 +1374,13 @@ export default function RosterDashboard() {
         <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur sm:w-fit">
           <button
             onClick={() =>
-              setActiveTab('roster')
+              setActiveTab(
+                'roster'
+              )
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'roster'
+              activeTab ===
+              'roster'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1186,10 +1390,13 @@ export default function RosterDashboard() {
 
           <button
             onClick={() =>
-              setActiveTab('coaching')
+              setActiveTab(
+                'coaching'
+              )
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'coaching'
+              activeTab ===
+              'coaching'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1199,10 +1406,13 @@ export default function RosterDashboard() {
 
           <button
             onClick={() =>
-              setActiveTab('schedule')
+              setActiveTab(
+                'schedule'
+              )
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'schedule'
+              activeTab ===
+              'schedule'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1212,10 +1422,13 @@ export default function RosterDashboard() {
 
           <button
             onClick={() =>
-              setActiveTab('depth-chart')
+              setActiveTab(
+                'depth-chart'
+              )
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'depth-chart'
+              activeTab ===
+              'depth-chart'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1224,28 +1437,35 @@ export default function RosterDashboard() {
           </button>
         </div>
 
-        {activeTab === 'roster' && (
+        {activeTab ===
+          'roster' && (
           <>
             <div className="glass-panel flex flex-col items-center justify-between gap-4 rounded-2xl p-4 md:flex-row">
               <div className="flex flex-wrap items-center gap-1">
-                {POSITIONS.map((position) => (
-                  <button
-                    key={position}
-                    onClick={() =>
-                      setSelectedPosition(
+                {POSITIONS.map(
+                  (position) => (
+                    <button
+                      key={
                         position
-                      )
-                    }
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                      selectedPosition ===
-                      position
-                        ? 'border-blue-400/30 bg-blue-500/20 text-blue-100 shadow-sm shadow-blue-950/30'
-                        : 'border-transparent bg-white/[0.04] text-slate-400 hover:border-white/10 hover:bg-white/[0.08] hover:text-slate-100'
-                    }`}
-                  >
-                    {position}
-                  </button>
-                ))}
+                      }
+                      onClick={() =>
+                        setSelectedPosition(
+                          position
+                        )
+                      }
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                        selectedPosition ===
+                        position
+                          ? 'border-blue-400/30 bg-blue-500/20 text-blue-100 shadow-sm shadow-blue-950/30'
+                          : 'border-transparent bg-white/[0.04] text-slate-400 hover:border-white/10 hover:bg-white/[0.08] hover:text-slate-100'
+                      }`}
+                    >
+                      {
+                        position
+                      }
+                    </button>
+                  )
+                )}
               </div>
 
               <div className="flex w-full items-center gap-3 md:w-auto">
@@ -1257,12 +1477,14 @@ export default function RosterDashboard() {
                       )
                     }
                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                      sortBy === 'number'
+                      sortBy ===
+                      'number'
                         ? 'bg-blue-500/20 text-blue-300'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    # {sortBy === 'number' &&
+                    # {sortBy ===
+                      'number' &&
                       (sortOrder ===
                       'asc'
                         ? '↑'
@@ -1276,13 +1498,15 @@ export default function RosterDashboard() {
                       )
                     }
                     className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                      sortBy === 'name'
+                      sortBy ===
+                      'name'
                         ? 'bg-blue-500/20 text-blue-300'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     Name{' '}
-                    {sortBy === 'name' &&
+                    {sortBy ===
+                      'name' &&
                       (sortOrder ===
                       'asc'
                         ? '↑'
@@ -1293,10 +1517,16 @@ export default function RosterDashboard() {
                 <input
                   type="text"
                   placeholder="Search name or jersey #..."
-                  value={search}
-                  onChange={(event) =>
+                  value={
+                    search
+                  }
+                  onChange={(
+                    event
+                  ) =>
                     setSearch(
-                      event.target.value
+                      event
+                        .target
+                        .value
                     )
                   }
                   className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
@@ -1318,7 +1548,8 @@ export default function RosterDashboard() {
                           )
                         }
                       >
-                        # {sortBy ===
+                        #{' '}
+                        {sortBy ===
                           'number' &&
                           (sortOrder ===
                           'asc'
@@ -1356,7 +1587,8 @@ export default function RosterDashboard() {
                       </th>
 
                       <th className="p-4">
-                        Hometown / Prev. School
+                        Hometown /
+                        Prev. School
                       </th>
 
                       <th className="w-72 p-4">
@@ -1369,11 +1601,16 @@ export default function RosterDashboard() {
                     {filteredPlayers.map(
                       (player) => (
                         <tr
-                          key={player.id}
+                          key={
+                            player.id
+                          }
                           className="transition hover:bg-blue-500/[0.04]"
                         >
                           <td className="p-4 font-mono font-bold text-slate-400">
-                            #{player.number}
+                            #
+                            {
+                              player.number
+                            }
                           </td>
 
                           <td className="p-4 font-semibold text-white">
@@ -1381,23 +1618,34 @@ export default function RosterDashboard() {
                               href={`/player/${player.id}`}
                               className="text-blue-400 transition hover:text-blue-300 hover:underline"
                             >
-                              {player.name}
+                              {
+                                player.name
+                              }
                             </Link>
                           </td>
 
                           <td className="p-4">
                             <span className="rounded-md border border-blue-400/15 bg-blue-500/10 px-2 py-1 text-xs font-bold text-blue-300">
-                              {player.position}
+                              {
+                                player.position
+                              }
                             </span>
                           </td>
 
                           <td className="p-4 text-slate-300">
-                            {player.eligibility}
+                            {
+                              player.eligibility
+                            }
                           </td>
 
                           <td className="p-4 text-slate-300">
-                            {player.height},{' '}
-                            {player.weight}{' '}
+                            {
+                              player.height
+                            }
+                            ,{' '}
+                            {
+                              player.weight
+                            }{' '}
                             lbs
                           </td>
 
@@ -1456,6 +1704,7 @@ export default function RosterDashboard() {
                                   setEditingNotesId(
                                     player.id
                                   );
+
                                   setTempNotes(
                                     player.notes ||
                                       ''
@@ -1487,20 +1736,26 @@ export default function RosterDashboard() {
           </>
         )}
 
-        {activeTab === 'coaching' && (
+        {activeTab ===
+          'coaching' && (
           <div className="space-y-6">
             <div className="glass-panel flex flex-col items-start justify-between gap-4 rounded-2xl p-4 sm:flex-row sm:items-center">
               <h2 className="text-lg font-semibold text-white">
-                Coaching & Support Personnel
+                Coaching & Support
+                Personnel
               </h2>
 
               <input
                 type="text"
                 placeholder="Search staff or title..."
-                value={search}
+                value={
+                  search
+                }
                 onChange={(event) =>
                   setSearch(
-                    event.target.value
+                    event
+                      .target
+                      .value
                   )
                 }
                 className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
@@ -1511,26 +1766,36 @@ export default function RosterDashboard() {
               {filteredStaff.map(
                 (member) => (
                   <div
-                    key={member.id}
+                    key={
+                      member.id
+                    }
                     className="glass-panel flex flex-col justify-between rounded-2xl p-5 transition hover:-translate-y-1 hover:border-blue-400/40"
                   >
                     <div>
                       <h3 className="mb-1 text-lg font-bold text-white">
-                        {member.name}
+                        {
+                          member.name
+                        }
                       </h3>
 
                       <p className="text-sm font-medium text-blue-400">
-                        {member.title}
+                        {
+                          member.title
+                        }
                       </p>
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-700/50 pt-3 text-xs text-slate-500">
                       <span>
-                        Staff ID: #{member.id}
+                        Staff ID: #
+                        {
+                          member.id
+                        }
                       </span>
 
                       <span className="text-slate-400">
-                        Football Operations
+                        Football
+                        Operations
                       </span>
                     </div>
                   </div>
@@ -1540,7 +1805,8 @@ export default function RosterDashboard() {
           </div>
         )}
 
-        {activeTab === 'schedule' && (
+        {activeTab ===
+          'schedule' && (
           <div className="glass-panel overflow-x-auto rounded-2xl p-6">
             <h2 className="mb-4 text-xl font-bold text-white">
               2026 Season Schedule
@@ -1573,7 +1839,10 @@ export default function RosterDashboard() {
 
               <tbody className="divide-y divide-slate-700/50">
                 {schedule.map(
-                  (game, index) => (
+                  (
+                    game,
+                    index
+                  ) => (
                     <tr
                       key={
                         game.id ||
@@ -1582,7 +1851,9 @@ export default function RosterDashboard() {
                       className="transition hover:bg-blue-500/[0.04]"
                     >
                       <td className="p-3 font-mono font-bold text-blue-400">
-                        {game.Date}
+                        {
+                          game.Date
+                        }
                       </td>
 
                       <td className="p-3 text-slate-300">
@@ -1594,12 +1865,29 @@ export default function RosterDashboard() {
                           : 'TBD'}
                       </td>
 
-                      <td className="p-3 font-semibold text-white">
-                        {game.Opponent}
+                      <td className="p-3 font-semibold">
+                        {game.id ? (
+                          <Link
+                            href={`/matchup/${game.id}`}
+                            className="text-blue-400 transition hover:text-blue-300 hover:underline"
+                          >
+                            {
+                              game.Opponent
+                            }
+                          </Link>
+                        ) : (
+                          <span className="text-white">
+                            {
+                              game.Opponent
+                            }
+                          </span>
+                        )}
                       </td>
 
                       <td className="p-3 text-slate-300">
-                        {game.Location}
+                        {
+                          game.Location
+                        }
                       </td>
 
                       <td className="p-3 text-xs italic text-slate-400">
@@ -1614,7 +1902,8 @@ export default function RosterDashboard() {
           </div>
         )}
 
-        {activeTab === 'depth-chart' &&
+        {activeTab ===
+          'depth-chart' &&
           renderDepthChart()}
       </main>
     </div>
