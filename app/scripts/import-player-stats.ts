@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const CFBD_API_KEY = process.env.CFBD_API_KEY;
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!CFBD_API_KEY) {
   throw new Error('Missing CFBD_API_KEY');
@@ -26,8 +27,9 @@ const CFBD_BASE_URL =
 
 const TEAM = 'Penn State';
 
-// Start with completed seasons.
-// We will add 2026 after confirming the importer works.
+// Completed seasons only.
+// The newer historical importer in /api/import-stats
+// is responsible for the broader historical data.
 const SEASONS = [2024, 2025];
 
 interface CFBDStat {
@@ -76,18 +78,29 @@ async function cfbdFetch<T>(
     `${CFBD_BASE_URL}${endpoint}`
   );
 
-  Object.entries(params).forEach(([key, value]) => {
-    url.searchParams.set(key, String(value));
-  });
+  Object.entries(params).forEach(
+    ([key, value]) => {
+      url.searchParams.set(
+        key,
+        String(value)
+      );
+    }
+  );
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${CFBD_API_KEY}`,
-    },
-  });
+  const response = await fetch(
+    url.toString(),
+    {
+      headers: {
+        Authorization:
+          `Bearer ${CFBD_API_KEY}`,
+        Accept: 'application/json',
+      },
+    }
+  );
 
   if (!response.ok) {
-    const body = await response.text();
+    const body =
+      await response.text();
 
     throw new Error(
       `CFBD ${response.status}: ${body}`
@@ -97,10 +110,15 @@ async function cfbdFetch<T>(
   return response.json();
 }
 
-async function getPlayers(): Promise<PlayerRecord[]> {
-  const { data, error } = await supabase
-    .from('players')
-    .select('id, name, cfbd_player_id');
+async function getPlayers(): Promise<
+  PlayerRecord[]
+> {
+  const { data, error } =
+    await supabase
+      .from('players')
+      .select(
+        'id, name, cfbd_player_id'
+      );
 
   if (error) {
     throw new Error(
@@ -114,19 +132,23 @@ async function getPlayers(): Promise<PlayerRecord[]> {
 async function getPennStateGames(
   season: number
 ): Promise<number[]> {
-  const games = await cfbdFetch<
-    {
-      id: number;
-      completed: boolean;
-      season: number;
-      homeTeam: string;
-      awayTeam: string;
-    }[]
-  >('/games', {
-    year: season,
-    team: TEAM,
-    seasonType: 'both',
-  });
+  const games =
+    await cfbdFetch<
+      {
+        id: number;
+        completed: boolean;
+        season: number;
+        homeTeam: string;
+        awayTeam: string;
+      }[]
+    >(
+      '/games',
+      {
+        year: season,
+        team: TEAM,
+        seasonType: 'both',
+      }
+    );
 
   return games
     .filter(
@@ -137,50 +159,76 @@ async function getPennStateGames(
           game.awayTeam === TEAM
         )
     )
-    .map((game) => game.id);
+    .map(
+      (game) => game.id
+    );
 }
 
 async function importSeason(
   season: number,
   players: PlayerRecord[]
 ) {
-  console.log(`\n================================`);
-  console.log(`Importing ${season}`);
-  console.log(`================================\n`);
+  console.log(
+    `\n================================`
+  );
 
-  const games = await getPennStateGames(season);
+  console.log(
+    `Importing ${season}`
+  );
+
+  console.log(
+    `================================\n`
+  );
+
+  const games =
+    await getPennStateGames(
+      season
+    );
 
   console.log(
     `Found ${games.length} completed Penn State games.`
   );
 
-  const playerMap = new Map<string, PlayerRecord>();
+  const playerMap =
+    new Map<
+      string,
+      PlayerRecord
+    >();
 
-  players.forEach((player) => {
-    playerMap.set(
-      normalizeName(player.name),
-      player
-    );
-  });
-
-  const seasonTotals = new Map<
-    number,
-    {
-      cfbd_player_id: string;
-      name: string;
-      games: Set<number>;
-      stats: Record<
-        string,
-        Record<string, string>
-      >;
+  players.forEach(
+    (player) => {
+      playerMap.set(
+        normalizeName(
+          player.name
+        ),
+        player
+      );
     }
-  >();
+  );
+
+  const seasonTotals =
+    new Map<
+      number,
+      {
+        cfbd_player_id: string;
+        name: string;
+        games: Set<number>;
+        stats: Record<
+          string,
+          Record<string, string>
+        >;
+      }
+    >();
 
   for (const gameId of games) {
-    console.log(`Processing game ${gameId}...`);
+    console.log(
+      `Processing game ${gameId}...`
+    );
 
     const gameData =
-      await cfbdFetch<CFBDGamePlayers[]>(
+      await cfbdFetch<
+        CFBDGamePlayers[]
+      >(
         '/games/players',
         {
           id: gameId,
@@ -189,29 +237,49 @@ async function importSeason(
 
     for (const game of gameData) {
       for (const team of game.teams) {
-        if (team.team !== TEAM) continue;
+        if (team.team !== TEAM) {
+          continue;
+        }
 
-        for (const category of team.categories) {
-          for (const type of category.types) {
-            for (const athlete of type.athletes) {
+        for (
+          const category
+          of team.categories
+        ) {
+          for (
+            const type
+            of category.types
+          ) {
+            for (
+              const athlete
+              of type.athletes
+            ) {
               const normalized =
-                normalizeName(athlete.name);
+                normalizeName(
+                  athlete.name
+                );
 
               const player =
-                playerMap.get(normalized);
+                playerMap.get(
+                  normalized
+                );
 
               if (!player) {
                 continue;
               }
 
               let record =
-                seasonTotals.get(player.id);
+                seasonTotals.get(
+                  player.id
+                );
 
               if (!record) {
                 record = {
-                  cfbd_player_id: athlete.id,
-                  name: athlete.name,
-                  games: new Set<number>(),
+                  cfbd_player_id:
+                    athlete.id,
+                  name:
+                    athlete.name,
+                  games:
+                    new Set<number>(),
                   stats: {},
                 };
 
@@ -221,23 +289,38 @@ async function importSeason(
                 );
               }
 
-              record.games.add(gameId);
+              record.games.add(
+                gameId
+              );
 
-              if (!record.stats[category.name]) {
-                record.stats[category.name] = {};
+              if (
+                !record.stats[
+                  category.name
+                ]
+              ) {
+                record.stats[
+                  category.name
+                ] = {};
               }
 
               const existing =
                 Number(
-                  record.stats[category.name][type.name]
+                  record.stats[
+                    category.name
+                  ][type.name]
                 ) || 0;
 
               const value =
-                Number(athlete.stat) || 0;
+                Number(
+                  athlete.stat
+                ) || 0;
 
-              record.stats[category.name][
-                type.name
-              ] = String(existing + value);
+              record.stats[
+                category.name
+              ][type.name] =
+                String(
+                  existing + value
+                );
             }
           }
         }
@@ -249,31 +332,60 @@ async function importSeason(
     `Found statistics for ${seasonTotals.size} players.`
   );
 
-  for (const [playerId, record] of seasonTotals) {
-    const player = players.find(
-      (p) => p.id === playerId
-    );
-
-    if (!player) continue;
-
-    const { error } = await supabase
-      .from('player_season_stats')
-      .upsert(
-        {
-          player_id: player.id,
-          cfbd_player_id:
-            record.cfbd_player_id,
-          season,
-          team: TEAM,
-          position: '',
-          games: record.games.size,
-          stats: record.stats,
-        },
-        {
-          onConflict:
-            'player_id,season',
-        }
+  /*
+   * IMPORTANT:
+   * Use Array.from() here instead of directly
+   * iterating the Map. This prevents the Vercel
+   * TypeScript downlevelIteration build error.
+   */
+  for (
+    const [
+      playerId,
+      record
+    ] of Array.from(
+      seasonTotals.entries()
+    )
+  ) {
+    const player =
+      players.find(
+        (p) =>
+          p.id === playerId
       );
+
+    if (!player) {
+      continue;
+    }
+
+    const { error } =
+      await supabase
+        .from(
+          'player_season_stats'
+        )
+        .upsert(
+          {
+            player_id:
+              player.id,
+
+            cfbd_player_id:
+              record.cfbd_player_id,
+
+            season,
+
+            team: TEAM,
+
+            position: '',
+
+            games:
+              record.games.size,
+
+            stats:
+              record.stats,
+          },
+          {
+            onConflict:
+              'player_id,season',
+          }
+        );
 
     if (error) {
       console.error(
@@ -293,13 +405,16 @@ async function main() {
     'Penn State Player Stats Importer'
   );
 
-  const players = await getPlayers();
+  const players =
+    await getPlayers();
 
   console.log(
     `Found ${players.length} players in Supabase.`
   );
 
-  for (const season of SEASONS) {
+  for (
+    const season of SEASONS
+  ) {
     await importSeason(
       season,
       players
@@ -311,8 +426,16 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error('\nIMPORT FAILED\n');
-  console.error(error);
-  process.exit(1);
-});
+main().catch(
+  (error) => {
+    console.error(
+      '\nIMPORT FAILED\n'
+    );
+
+    console.error(
+      error
+    );
+
+    process.exit(1);
+  }
+);
