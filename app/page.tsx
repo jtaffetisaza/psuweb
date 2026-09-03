@@ -345,17 +345,16 @@ export default function RosterDashboard() {
       const cleaned: DepthAssignments = {};
 
       ALL_DEPTH_SLOTS.forEach((slot) => {
-        const ids = Array.isArray(
-          saved?.[slot.id]
-        )
-          ? saved?.[slot.id]
-          : [];
+        const ids: number[] = Array.isArray(saved?.[slot.id])
+  ? saved[slot.id]
+  : [];
 
-        cleaned[slot.id] = ids.filter(
-          (id, index, array) =>
-            validPlayerIds.has(id) &&
-            array.indexOf(id) === index
-        );
+cleaned[slot.id] = ids.filter(
+  (id, index, array) =>
+    validPlayerIds.has(id) &&
+    array.indexOf(id) === index
+);
+        
       });
 
       const assignedIds = new Set(
