@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 interface Player {
@@ -24,6 +25,15 @@ interface StaffMember {
   title: string;
 }
 
+interface Game {
+  id?: number;
+  Date: string;
+  Time: string | null;
+  Opponent: string;
+  Location: string;
+  Note: string | null;
+}
+
 const POSITIONS = [
   'ALL',
   'QB',
@@ -42,22 +52,25 @@ const POSITIONS = [
 ];
 
 export default function RosterDashboard() {
-  // Main Tab Toggle State
-  const [activeTab, setActiveTab] = useState<'roster' | 'coaching'>('roster');
+  const [activeTab, setActiveTab] = useState<
+    'roster' | 'coaching' | 'schedule' | 'depth-chart'
+  >('roster');
 
-  // Data States
   const [players, setPlayers] = useState<Player[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [schedule, setSchedule] = useState<Game[]>([]);
 
-  // Roster Filter States
   const [selectedPosition, setSelectedPosition] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'number' | 'name'>('number');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
   const [tempNotes, setTempNotes] = useState('');
 
   useEffect(() => {
     fetchPlayers();
     fetchStaffData();
+    fetchSchedule();
   }, []);
 
   async function fetchPlayers() {
@@ -80,6 +93,16 @@ export default function RosterDashboard() {
 
     if (error) console.error('Error fetching staff:', error);
     else setStaff(data || []);
+  }
+
+  async function fetchSchedule() {
+    const { data, error } = await supabase
+      .from('Schedule')
+      .select('*')
+      .order('Date', { ascending: true });
+
+    if (error) console.error('Error fetching schedule:', error);
+    else setSchedule(data || []);
   }
 
   async function saveNotes(id: number) {
@@ -109,14 +132,33 @@ export default function RosterDashboard() {
     }
   }
 
-  const filteredPlayers = players.filter((p) => {
-    const matchesPos =
-      selectedPosition === 'ALL' || p.position === selectedPosition;
-    const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.number.toString().includes(search);
-    return matchesPos && matchesSearch;
-  });
+  const handleSortToggle = (field: 'number' | 'name') => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const filteredPlayers = players
+    .filter((p) => {
+      const matchesPos =
+        selectedPosition === 'ALL' || p.position === selectedPosition;
+      const matchesSearch =
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.number.toString().includes(search);
+      return matchesPos && matchesSearch;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === 'number') {
+        comparison = a.number - b.number;
+      } else {
+        comparison = a.name.localeCompare(b.name);
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
 
   const filteredStaff = staff.filter(
     (s) =>
@@ -125,57 +167,75 @@ export default function RosterDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-8 font-sans">
-      <header className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-1">
-            Blitz Football Dashboard
-          </h1>
-          <p className="text-slate-400">
-            Manage player depth ranks, scouting notes, and coaching personnel.
-          </p>
-        </div>
+    <div className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
+      <header className="mx-auto mb-8 max-w-7xl">
+        <h1 className="mb-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          2026 Football Dashboard
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
+          Manage player depth ranks, scouting notes, coaching personnel, and
+          schedule.
+        </p>
+      </header>
 
-        {/* Top-Level Navigation Tabs */}
-        <div className="flex bg-slate-800 p-1.5 rounded-xl border border-slate-700">
+      <main className="mx-auto max-w-7xl space-y-6">
+        {/* Navigation Tabs Bar */}
+        <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur sm:w-fit">
           <button
             onClick={() => setActiveTab('roster')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition ${
+            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
               activeTab === 'roster'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
           >
             Player Roster
           </button>
           <button
             onClick={() => setActiveTab('coaching')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition ${
+            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
               activeTab === 'coaching'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
           >
             Coaching Staff
           </button>
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+              activeTab === 'schedule'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Schedule
+          </button>
+          <button
+            onClick={() => setActiveTab('depth-chart')}
+            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+              activeTab === 'depth-chart'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Depth Chart
+          </button>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto space-y-6">
         {/* VIEW 1: PLAYER ROSTER */}
         {activeTab === 'roster' && (
           <>
-            {/* Controls Bar */}
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700">
-              <div className="flex flex-wrap gap-1">
+            <div className="glass-panel flex flex-col items-center justify-between gap-4 rounded-2xl p-4 md:flex-row">
+              <div className="flex flex-wrap items-center gap-1">
                 {POSITIONS.map((pos) => (
                   <button
                     key={pos}
                     onClick={() => setSelectedPosition(pos)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                       selectedPosition === pos
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                        ? 'border-blue-400/30 bg-blue-500/20 text-blue-100 shadow-sm shadow-blue-950/30'
+                        : 'border-transparent bg-white/[0.04] text-slate-400 hover:border-white/10 hover:bg-white/[0.08] hover:text-slate-100'
                     }`}
                   >
                     {pos}
@@ -183,22 +243,56 @@ export default function RosterDashboard() {
                 ))}
               </div>
 
-              <input
-                type="text"
-                placeholder="Search name or jersey #..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="bg-slate-900 border border-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm w-full md:w-64 focus:outline-none focus:border-blue-500"
-              />
+              <div className="flex w-full items-center gap-3 md:w-auto">
+                <div className="flex items-center rounded-lg border border-white/10 bg-white/[0.04] p-1">
+                  <button
+                    onClick={() => handleSortToggle('number')}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                      sortBy === 'number'
+                        ? 'bg-blue-500/20 text-blue-300'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    # {sortBy === 'number' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </button>
+                  <button
+                    onClick={() => handleSortToggle('name')}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                      sortBy === 'name'
+                        ? 'bg-blue-500/20 text-blue-300'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Search name or jersey #..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
+                />
+              </div>
             </div>
 
-            {/* Roster Table */}
-            <div className="overflow-x-auto bg-slate-800 rounded-xl border border-slate-700">
-              <table className="w-full text-left border-collapse text-sm">
+            <div className="glass-panel overflow-x-auto rounded-2xl">
+              <table className="w-full border-collapse text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-700 text-slate-400 font-medium bg-slate-800/80">
-                    <th className="p-4">#</th>
-                    <th className="p-4">Name</th>
+                  <tr className="border-b border-slate-700 bg-slate-950/35 font-medium text-slate-400">
+                    <th
+                      className="cursor-pointer p-4 hover:text-white"
+                      onClick={() => handleSortToggle('number')}
+                    >
+                      # {sortBy === 'number' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="cursor-pointer p-4 hover:text-white"
+                      onClick={() => handleSortToggle('name')}
+                    >
+                      Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="p-4">Pos</th>
                     <th className="p-4">Depth Order</th>
                     <th className="p-4">Class</th>
@@ -211,16 +305,21 @@ export default function RosterDashboard() {
                   {filteredPlayers.map((player) => (
                     <tr
                       key={player.id}
-                      className="hover:bg-slate-700/30 transition"
+                      className="transition hover:bg-blue-500/[0.04]"
                     >
                       <td className="p-4 font-mono font-bold text-slate-400">
                         #{player.number}
                       </td>
                       <td className="p-4 font-semibold text-white">
-                        {player.name}
+                        <Link
+                          href={`/player/${player.id}`}
+                          className="text-blue-400 transition hover:text-blue-300 hover:underline"
+                        >
+                          {player.name}
+                        </Link>
                       </td>
                       <td className="p-4">
-                        <span className="bg-slate-700 px-2 py-1 rounded text-xs font-bold text-blue-400">
+                        <span className="rounded-md border border-blue-400/15 bg-blue-500/10 px-2 py-1 text-xs font-bold text-blue-300">
                           {player.position}
                         </span>
                       </td>
@@ -235,7 +334,7 @@ export default function RosterDashboard() {
                               parseInt(e.target.value) || 0
                             )
                           }
-                          className="w-12 bg-slate-900 border border-slate-700 text-center rounded text-xs py-1 focus:outline-none focus:border-blue-500"
+                          className="dark-field w-12 py-1 text-center text-xs"
                         />
                       </td>
                       <td className="p-4 text-slate-300">
@@ -244,7 +343,7 @@ export default function RosterDashboard() {
                       <td className="p-4 text-slate-300">
                         {player.height}, {player.weight} lbs
                       </td>
-                      <td className="p-4 text-slate-400 text-xs">
+                      <td className="p-4 text-xs text-slate-400">
                         <div>{player.hometown}</div>
                         {player.previous_school && (
                           <div className="text-blue-400">
@@ -259,11 +358,11 @@ export default function RosterDashboard() {
                               type="text"
                               value={tempNotes}
                               onChange={(e) => setTempNotes(e.target.value)}
-                              className="bg-slate-900 border border-slate-600 px-2 py-1 rounded text-xs text-white w-full focus:outline-none"
+                              className="dark-field w-full px-2 py-1 text-xs"
                             />
                             <button
                               onClick={() => saveNotes(player.id)}
-                              className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold"
+                              className="blue-button px-3 py-1 text-xs"
                             >
                               Save
                             </button>
@@ -274,10 +373,10 @@ export default function RosterDashboard() {
                               setEditingNotesId(player.id);
                               setTempNotes(player.notes || '');
                             }}
-                            className="cursor-pointer text-xs text-slate-300 hover:text-white italic min-h-[1.5rem] flex items-center"
+                            className="flex min-h-[1.5rem] cursor-pointer items-center text-xs italic text-slate-300 hover:text-white"
                           >
                             {player.notes || (
-                              <span className="text-slate-500 not-italic">
+                              <span className="not-italic text-slate-500">
                                 + Add notes...
                               </span>
                             )}
@@ -295,7 +394,7 @@ export default function RosterDashboard() {
         {/* VIEW 2: COACHING & SUPPORT STAFF */}
         {activeTab === 'coaching' && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700">
+            <div className="glass-panel flex flex-col items-start justify-between gap-4 rounded-2xl p-4 sm:flex-row sm:items-center">
               <h2 className="text-lg font-semibold text-white">
                 Coaching & Support Personnel
               </h2>
@@ -304,31 +403,83 @@ export default function RosterDashboard() {
                 placeholder="Search staff or title..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="bg-slate-900 border border-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm w-full md:w-64 focus:outline-none focus:border-blue-500"
+                className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredStaff.map((member) => (
                 <div
                   key={member.id}
-                  className="bg-slate-800 p-5 rounded-xl border border-slate-700 hover:border-blue-500/50 transition flex flex-col justify-between"
+                  className="glass-panel flex flex-col justify-between rounded-2xl p-5 transition hover:-translate-y-1 hover:border-blue-400/40"
                 >
                   <div>
-                    <h3 className="text-lg font-bold text-white mb-1">
+                    <h3 className="mb-1 text-lg font-bold text-white">
                       {member.name}
                     </h3>
                     <p className="text-sm font-medium text-blue-400">
                       {member.title}
                     </p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-700/50 flex justify-between items-center text-xs text-slate-500">
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-700/50 pt-3 text-xs text-slate-500">
                     <span>Staff ID: #{member.id}</span>
                     <span className="text-slate-400">Football Operations</span>
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* VIEW 3: SCHEDULE */}
+        {activeTab === 'schedule' && (
+          <div className="glass-panel overflow-x-auto rounded-2xl p-6">
+            <h2 className="mb-4 text-xl font-bold text-white">
+              2026 Season Schedule
+            </h2>
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-700 bg-slate-950/35 font-medium text-slate-400">
+                  <th className="p-3">Date</th>
+                  <th className="p-3">Time</th>
+                  <th className="p-3">Opponent</th>
+                  <th className="p-3">Location</th>
+                  <th className="p-3">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {schedule.map((game, index) => (
+                  <tr
+                    key={game.id || index}
+                    className="transition hover:bg-blue-500/[0.04]"
+                  >
+                    <td className="p-3 font-mono font-bold text-blue-400">
+                      {game.Date}
+                    </td>
+                    <td className="p-3 text-slate-300">
+                      {game.Time ? game.Time.slice(0, 5) : 'TBD'}
+                    </td>
+                    <td className="p-3 font-semibold text-white">
+                      {game.Opponent}
+                    </td>
+                    <td className="p-3 text-slate-300">{game.Location}</td>
+                    <td className="p-3 text-xs italic text-slate-400">
+                      {game.Note || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* VIEW 4: DEPTH CHART */}
+        {activeTab === 'depth-chart' && (
+          <div className="glass-panel rounded-2xl p-6 text-slate-300">
+            <h2 className="mb-2 text-xl font-bold text-white">Depth Chart</h2>
+            <p className="text-sm text-slate-400">
+              Depth chart view placeholder content.
+            </p>
           </div>
         )}
       </main>
