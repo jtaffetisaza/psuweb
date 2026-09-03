@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 interface Player {
   id: number;
-  number: number;
+  number?: number;
+  jersey_number?: number;
+  jersey?: number;
   name: string;
   position: string;
   eligibility: string;
@@ -17,22 +20,24 @@ interface Player {
   previous_school: string;
   notes: string;
   depth_rank: number;
+  star_rating?: number;
+  composite_rating?: number;
 }
 
-export default function PlayerProfilePage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const playerId = params.id;
+export default function PlayerProfilePage() {
+  const params = useParams();
+  const playerId = params?.id as string;
+
   const [player, setPlayer] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
-    fetchPlayer();
+    if (playerId) {
+      fetchPlayer();
+    }
   }, [playerId]);
 
   async function fetchPlayer() {
@@ -44,7 +49,7 @@ export default function PlayerProfilePage({
       .single();
 
     if (error) {
-      console.error('Error fetching player:', error);
+      console.error('Error fetching player details:', error);
     } else if (data) {
       setPlayer(data);
       setNotes(data.notes || '');
@@ -52,26 +57,26 @@ export default function PlayerProfilePage({
     setLoading(false);
   }
 
-  async function handleSaveNotes() {
+  async function saveNotes() {
     if (!player) return;
-    setSavingNotes(true);
+    setSaving(true);
     const { error } = await supabase
       .from('players')
       .update({ notes })
       .eq('id', player.id);
 
-    setSavingNotes(false);
+    setSaving(false);
     if (!error) {
       setPlayer({ ...player, notes });
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
     }
   }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-slate-400">
-        Loading player details...
+        Loading player profile...
       </div>
     );
   }
@@ -93,9 +98,12 @@ export default function PlayerProfilePage({
     );
   }
 
+  const jerseyNum = player.number ?? player.jersey_number ?? player.jersey ?? 0;
+
   return (
     <div className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
       <div className="mx-auto max-w-5xl space-y-6">
+        {/* Back Button */}
         <Link
           href="/"
           className="inline-flex items-center text-sm font-semibold text-blue-400 transition hover:text-blue-300 hover:underline"
@@ -103,10 +111,11 @@ export default function PlayerProfilePage({
           ← Back to Dashboard
         </Link>
 
+        {/* Player Header Banner */}
         <div className="glass-panel flex flex-col justify-between gap-6 rounded-2xl p-6 sm:flex-row sm:items-center">
           <div className="flex items-center gap-4">
             <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-900 text-3xl font-black text-white shadow-lg shadow-blue-950/50">
-              #{player.number}
+              #{jerseyNum}
             </div>
             <div>
               <h1 className="text-3xl font-extrabold text-white">
@@ -117,7 +126,7 @@ export default function PlayerProfilePage({
                   {player.position}
                 </span>
                 <span className="text-sm text-slate-400">
-                  Depth Rank: #{player.depth_rank || 0}
+                  Depth Rank: #{player.depth_rank || '-'}
                 </span>
               </div>
             </div>
@@ -128,7 +137,8 @@ export default function PlayerProfilePage({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {/* Physical & Recruiting Stats */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           <div className="glass-panel rounded-xl p-4">
             <p className="text-xs text-slate-400">Height</p>
             <p className="mt-1 text-xl font-bold text-white">{player.height}</p>
@@ -153,14 +163,28 @@ export default function PlayerProfilePage({
                 : player.high_school || 'N/A'}
             </p>
           </div>
+          <div className="glass-panel rounded-xl p-4">
+            <p className="text-xs text-slate-400">247 Composite</p>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="text-lg font-bold text-amber-400">
+                {'★'.repeat(player.star_rating || 3)}
+              </span>
+              {player.composite_rating && (
+                <span className="text-xs text-slate-400">
+                  ({player.composite_rating.toFixed(4)})
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* Scouting Notes Editor */}
         <div className="glass-panel rounded-2xl p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-white">
-              Scouting Notes & Player Blurb
+              Scouting & Staff Notes
             </h2>
-            {savedSuccess && (
+            {saveSuccess && (
               <span className="text-xs font-semibold text-emerald-400">
                 ✓ Saved successfully!
               </span>
@@ -170,16 +194,16 @@ export default function PlayerProfilePage({
             rows={5}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Write scouting blurbs, evaluation notes, scheme fit, strengths..."
+            placeholder="Add detailed evaluation notes..."
             className="dark-field w-full rounded-xl p-4 text-sm leading-relaxed text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <div className="mt-4 flex justify-end">
             <button
-              onClick={handleSaveNotes}
-              disabled={savingNotes}
+              onClick={saveNotes}
+              disabled={saving}
               className="rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:from-blue-600 hover:to-blue-800 disabled:opacity-50"
             >
-              {savingNotes ? 'Saving...' : 'Save Blurb & Notes'}
+              {saving ? 'Saving...' : 'Save Profile Notes'}
             </button>
           </div>
         </div>
