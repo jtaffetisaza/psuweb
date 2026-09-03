@@ -235,12 +235,7 @@ async function loadPlayers(): Promise<Player[]> {
 }
 
 /**
- * We already have CFBD IDs for the roster.
- *
- * We still need /player/search because CFBD's player
- * search response contains the historical teamStints.
- *
- * Existing CFBD ID is used as the authoritative match.
+ * Retrieve historical team stints for a player.
  */
 async function getPlayerHistory(
   player: Player
@@ -293,6 +288,9 @@ async function getPlayerHistory(
 /**
  * Convert CFBD team stints into unique
  * team + season requests.
+ *
+ * Uses Array.from() everywhere so this works
+ * with the TypeScript target used by Vercel.
  */
 function buildTeamSeasonRequests(
   histories: Map<number, CFBDPlayer>
@@ -300,7 +298,11 @@ function buildTeamSeasonRequests(
   const unique =
     new Map<string, TeamSeasonRequest>();
 
-    for (const player of Array.from(histories.values())) {    const stints =
+  const historyPlayers =
+    Array.from(histories.values());
+
+  for (const player of historyPlayers) {
+    const stints =
       player.teamStints ?? [];
 
     for (const stint of stints) {
@@ -383,22 +385,7 @@ async function fetchSeasonStats(
 }
 
 /**
- * Build the stats JSON exactly as returned by CFBD,
- * but grouped by category for easier use on the
- * player profile page.
- *
- * Example:
- *
- * {
- *   passing: {
- *     YDS: 2500,
- *     TD: 22
- *   },
- *   rushing: {
- *     CAR: 50,
- *     YDS: 200
- *   }
- * }
+ * Build grouped statistics JSON for one player.
  */
 function buildStatsObject(
   stats: CFBDSeasonStat[],
@@ -433,14 +420,7 @@ function buildStatsObject(
 
 /**
  * Attempt to determine games played from
- * CFBD season statistics.
- *
- * CFBD's /player/season/overview endpoint
- * has been intermittently closing connections,
- * so we don't depend on it for the import.
- *
- * We inspect common "games" stat names if CFBD
- * provides them in the season stats response.
+ * the season statistics response.
  */
 function extractGames(
   stats: CFBDSeasonStat[],
@@ -460,23 +440,25 @@ function extractGames(
   ];
 
   for (const stat of playerStats) {
-    if (
+    const matchesGameName =
       possibleGameNames.some(
         (name) =>
           name.toLowerCase() ===
           stat.statType.toLowerCase()
-      )
-    ) {
-      const value = Number(
-        stat.stat
       );
 
-      if (
-        Number.isFinite(value) &&
-        value > 0
-      ) {
-        return value;
-      }
+    if (!matchesGameName) {
+      continue;
+    }
+
+    const value =
+      Number(stat.stat);
+
+    if (
+      Number.isFinite(value) &&
+      value > 0
+    ) {
+      return value;
     }
   }
 
@@ -484,8 +466,8 @@ function extractGames(
 }
 
 /**
- * Create the exact row expected by the
- * player_season_stats table.
+ * Create the exact row expected by
+ * player_season_stats.
  */
 function buildImportRow(
   player: Player,
@@ -524,8 +506,8 @@ function buildImportRow(
 }
 
 /**
- * Check whether CFBD actually returned useful
- * statistics for this player.
+ * Check whether CFBD actually returned
+ * useful statistics for this player.
  */
 function hasUsableStats(
   row: ImportRow
@@ -536,8 +518,7 @@ function hasUsableStats(
 }
 
 /**
- * Supabase inserts are done in batches so that
- * one huge request isn't created.
+ * Insert rows in batches.
  */
 async function insertRows(
   rows: ImportRow[]
@@ -598,11 +579,9 @@ export async function GET() {
       "======================================"
     );
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 1
      * Load current Penn State roster.
-     * --------------------------------------------------
      */
 
     const players =
@@ -637,14 +616,9 @@ export async function GET() {
       );
     }
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 2
      * Retrieve historical team stints.
-     *
-     * This is the only place where we perform
-     * player searches.
-     * --------------------------------------------------
      */
 
     const histories =
@@ -705,11 +679,9 @@ export async function GET() {
         `${histories.size}/${players.length} players`
     );
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 3
-     * Build unique historical school/season requests.
-     * --------------------------------------------------
+     * Build unique school/season requests.
      */
 
     const teamSeasonRequests =
@@ -722,11 +694,9 @@ export async function GET() {
         `unique team/season combinations`
     );
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 4
      * Fetch season statistics.
-     * --------------------------------------------------
      */
 
     const statsByTeamSeason =
@@ -791,11 +761,9 @@ export async function GET() {
         `${teamSeasonRequests.length} team/season requests`
     );
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 5
      * Build database rows.
-     * --------------------------------------------------
      */
 
     const rows: ImportRow[] =
@@ -832,6 +800,10 @@ export async function GET() {
 
           const team =
             stint.team.trim();
+
+          if (!team) {
+            continue;
+          }
 
           const key =
             `${season}|${team.toLowerCase()}`;
@@ -876,10 +848,10 @@ export async function GET() {
       }
     }
 
-    /*
+    /**
      * Remove accidental duplicates.
      *
-     * The natural key is:
+     * Natural key:
      * player_id + season + team
      */
 
@@ -908,12 +880,11 @@ export async function GET() {
       `Built ${finalRows.length} database rows`
     );
 
-    /*
-     * --------------------------------------------------
+    /**
      * SAFETY CHECK
      *
-     * Never wipe the table if CFBD produced zero rows.
-     * --------------------------------------------------
+     * Never wipe the table if CFBD
+     * produced zero rows.
      */
 
     if (!finalRows.length) {
@@ -950,13 +921,10 @@ export async function GET() {
       );
     }
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 6
-     * Delete existing rows for the current roster.
-     *
-     * This happens ONLY after successful CFBD collection.
-     * --------------------------------------------------
+     * Delete existing rows for the
+     * current roster.
      */
 
     console.log(
@@ -969,8 +937,9 @@ export async function GET() {
           player.id
       );
 
-    const { error:
-      deleteError } =
+    const {
+      error: deleteError,
+    } =
       await supabase
         .from(
           "player_season_stats"
@@ -987,11 +956,9 @@ export async function GET() {
       );
     }
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 7
      * Insert fresh historical data.
-     * --------------------------------------------------
      */
 
     const inserted =
@@ -999,11 +966,9 @@ export async function GET() {
         finalRows
       );
 
-    /*
-     * --------------------------------------------------
+    /**
      * STEP 8
      * Build summary.
-     * --------------------------------------------------
      */
 
     const seasonSummary =
@@ -1026,7 +991,7 @@ export async function GET() {
               )
             );
 
-          const players =
+          const seasonPlayers =
             new Set(
               seasonRows.map(
                 (row) =>
@@ -1041,7 +1006,7 @@ export async function GET() {
               seasonRows.length,
 
             players:
-              players.size,
+              seasonPlayers.size,
 
             teams,
           };
