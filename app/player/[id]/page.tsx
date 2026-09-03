@@ -560,7 +560,7 @@ export default function PlayerProfilePage() {
             </h2>
 
             <p className="mt-1 text-xs text-slate-500">
-              Combined statistics across the player's college career
+              Combined statistics across the player&apos;s college career
             </p>
           </div>
 
