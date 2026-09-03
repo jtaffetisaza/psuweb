@@ -177,7 +177,32 @@ export default function PlayerProfilePage() {
             </div>
           </div>
         </div>
-
+{/* Career Statistics Block */}
+<div className="glass-panel rounded-2xl p-6">
+          <h2 className="mb-4 text-lg font-bold text-white">
+            Career Statistics
+          </h2>
+          {player.stats && Object.keys(player.stats).length > 0 ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {Object.entries(player.stats).map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-white/5 bg-white/[0.03] p-4"
+                >
+                  <p className="text-xs font-medium text-slate-400">{label}</p>
+                  <p className="mt-1 text-2xl font-black text-blue-400">
+                    {String(value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 italic">
+              No recorded game statistics found for this player.
+            </p>
+          )}
+        </div>
+        
         {/* Scouting Notes Editor */}
         <div className="glass-panel rounded-2xl p-6">
           <div className="mb-4 flex items-center justify-between">
