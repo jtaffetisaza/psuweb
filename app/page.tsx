@@ -16,6 +16,15 @@ interface Player {
   high_school: string;
   previous_school: string;
   notes: string;
+
+  // Recruiting
+  star_rating: number | null;
+  recruiting_class: number | null;
+  national_rank: number | null;
+  position_rank: number | null;
+  state_rank: number | null;
+  recruiting_position: string | null;
+  recruiting_team: string | null;
 }
 
 interface StaffMember {
@@ -125,7 +134,7 @@ const DEFENSE_SLOTS: DepthSlot[] = [
   {
     id: 'DE1',
     label: 'DE',
-    eligiblePositions: ['DE'],
+    eligiblePositions: ['DE', 'LB'],
   },
   {
     id: 'DT1',
@@ -140,27 +149,22 @@ const DEFENSE_SLOTS: DepthSlot[] = [
   {
     id: 'DE2',
     label: 'DE',
-    eligiblePositions: ['DE'],
+    eligiblePositions: ['DE', 'LB'],
   },
   {
-    id: 'WILL',
-    label: 'WILL',
+    id: 'ILB',
+    label: 'ILB',
     eligiblePositions: ['LB'],
   },
   {
-    id: 'MIKE',
-    label: 'MIKE',
-    eligiblePositions: ['LB'],
-  },
-  {
-    id: 'SAM',
-    label: 'SAM',
+    id: 'OLB',
+    label: 'OLB',
     eligiblePositions: ['LB'],
   },
   {
     id: 'CB',
     label: 'CB',
-    eligiblePositions: ['CB'],
+    eligiblePositions: ['CB', 'S'],
   },
   {
     id: 'NICKLE',
@@ -448,6 +452,26 @@ export default function RosterDashboard() {
 
     const cleaned: DepthAssignments = {};
 
+    if (saved) {
+      if (
+        Array.isArray(saved.MIKE) &&
+        !Array.isArray(saved.ILB)
+      ) {
+        saved.ILB = saved.MIKE;
+      }
+
+      if (!Array.isArray(saved.OLB)) {
+        saved.OLB = [
+          ...(Array.isArray(saved.WILL)
+            ? saved.WILL
+            : []),
+          ...(Array.isArray(saved.SAM)
+            ? saved.SAM
+            : []),
+        ];
+      }
+    }
+
     ALL_DEPTH_SLOTS.forEach((slot) => {
       const ids: number[] =
         saved &&
@@ -549,7 +573,7 @@ export default function RosterDashboard() {
 
     addPlayersToSlots(
       'LB',
-      ['WILL', 'MIKE', 'SAM']
+      ['ILB', 'OLB']
     );
 
     addPlayersToSlots(
@@ -1025,15 +1049,6 @@ export default function RosterDashboard() {
                 string.
               </p>
             </div>
-
-            <button
-              onClick={
-                resetDepthChart
-              }
-              className="rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/20"
-            >
-              Reset Depth Chart
-            </button>
           </div>
 
           <div className="mt-5 flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5">
