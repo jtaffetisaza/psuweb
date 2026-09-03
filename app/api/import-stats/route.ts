@@ -300,8 +300,7 @@ function buildTeamSeasonRequests(
   const unique =
     new Map<string, TeamSeasonRequest>();
 
-  for (const player of histories.values()) {
-    const stints =
+    for (const player of Array.from(histories.values())) {    const stints =
       player.teamStints ?? [];
 
     for (const stint of stints) {
