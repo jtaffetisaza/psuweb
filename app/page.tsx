@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
@@ -39,10 +39,7 @@ interface DepthSlot {
   eligiblePositions: string[];
 }
 
-interface DragData {
-  playerId: number;
-  sourceSlotId: string | null;
-}
+type DepthChartTab = 'offense' | 'defense' | 'special-teams';
 
 type DepthAssignments = Record<string, number[]>;
 
@@ -203,48 +200,35 @@ const ALL_DEPTH_SLOTS = [
   ...SPECIAL_TEAMS_SLOTS,
 ];
 
-const DEPTH_STORAGE_KEY =
-  'psu-football-depth-chart-v2';
-
 export default function RosterDashboard() {
   const [activeTab, setActiveTab] = useState<
     'roster' | 'coaching' | 'schedule' | 'depth-chart'
   >('roster');
 
-  const [depthChartTab, setDepthChartTab] = useState<
-    'offense' | 'defense' | 'special-teams'
-  >('offense');
-
   const [players, setPlayers] = useState<Player[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [schedule, setSchedule] = useState<Game[]>([]);
 
-  const [selectedPosition, setSelectedPosition] =
-    useState('ALL');
-
+  const [selectedPosition, setSelectedPosition] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  const [sortBy, setSortBy] = useState<
-    'number' | 'name'
-  >('number');
+  const [sortBy, setSortBy] = useState<'number' | 'name'>('number');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const [sortOrder, setSortOrder] = useState<
-    'asc' | 'desc'
-  >('asc');
-
-  const [editingNotesId, setEditingNotesId] =
-    useState<number | null>(null);
-
+  const [editingNotesId, setEditingNotesId] = useState<number | null>(null);
   const [tempNotes, setTempNotes] = useState('');
+
+  const [depthChartTab, setDepthChartTab] =
+    useState<DepthChartTab>('offense');
 
   const [depthAssignments, setDepthAssignments] =
     useState<DepthAssignments>({});
 
-  const [depthLoaded, setDepthLoaded] =
-    useState(false);
+  const [draggedPlayerId, setDraggedPlayerId] =
+    useState<number | null>(null);
 
-  const [draggedPlayer, setDraggedPlayer] =
-    useState<DragData | null>(null);
+  const [draggedFromSlot, setDraggedFromSlot] =
+    useState<string | null>(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -252,594 +236,122 @@ export default function RosterDashboard() {
     fetchSchedule();
   }, []);
 
+  useEffect(() => {
+    initializeDepthAssignments();
+  }, [players]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (Object.keys(depthAssignments).length === 0) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      'psu-football-depth-chart-v2',
+      JSON.stringify(depthAssignments)
+    );
+  }, [depthAssignments]);
+
   async function fetchPlayers() {
     const { data, error } = await supabase
       .from('players')
       .select('*')
-      .order('position', {
-        ascending: true,
-      })
-      .order('number', {
-        ascending: true,
-      });
+      .order('position', { ascending: true })
+      .order('number', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching players:',
-        error
-      );
-    } else {
-      setPlayers(data || []);
+      console.error('Error fetching players:', error);
+      return;
     }
+
+    setPlayers((data || []) as Player[]);
   }
 
   async function fetchStaffData() {
     const { data, error } = await supabase
       .from('football_staff')
       .select('*')
-      .order('id', {
-        ascending: true,
-      });
+      .order('id', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching staff:',
-        error
-      );
-    } else {
-      setStaff(data || []);
+      console.error('Error fetching staff:', error);
+      return;
     }
+
+    setStaff((data || []) as StaffMember[]);
   }
 
   async function fetchSchedule() {
     const { data, error } = await supabase
       .from('Schedule')
       .select('*')
-      .order('Date', {
-        ascending: true,
-      });
+      .order('Date', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching schedule:',
-        error
-      );
-    } else {
-      setSchedule(data || []);
-    }
-  }
-
-  useEffect(() => {
-    if (!players.length || depthLoaded) return;
-
-    initializeDepthAssignments(players);
-  }, [players, depthLoaded]);
-
-  function initializeDepthAssignments(
-    currentPlayers: Player[]
-  ) {
-    let saved: DepthAssignments | null = null;
-
-    try {
-      const raw = localStorage.getItem(
-        DEPTH_STORAGE_KEY
-      );
-
-      if (raw) {
-        saved = JSON.parse(raw);
-      }
-    } catch (error) {
-      console.error(
-        'Error loading depth chart:',
-        error
-      );
-    }
-
-    if (saved) {
-      const validPlayerIds = new Set(
-        currentPlayers.map(
-          (player) => player.id
-        )
-      );
-
-      const cleaned: DepthAssignments = {};
-
-      ALL_DEPTH_SLOTS.forEach((slot) => {
-        const ids: number[] = Array.isArray(saved?.[slot.id])
-  ? saved[slot.id]
-  : [];
-
-cleaned[slot.id] = ids.filter(
-  (id, index, array) =>
-    validPlayerIds.has(id) &&
-    array.indexOf(id) === index
-);
-        
-      });
-
-      const assignedIds = new Set(
-        Object.values(cleaned).flat()
-      );
-
-      const missingPlayers =
-        currentPlayers.filter(
-          (player) =>
-            !assignedIds.has(player.id)
-        );
-
-      const defaults =
-        createDefaultAssignments(
-          missingPlayers
-        );
-
-      ALL_DEPTH_SLOTS.forEach((slot) => {
-        cleaned[slot.id] = [
-          ...(cleaned[slot.id] || []),
-          ...(defaults[slot.id] || []),
-        ];
-      });
-
-      setDepthAssignments(cleaned);
-
-      localStorage.setItem(
-        DEPTH_STORAGE_KEY,
-        JSON.stringify(cleaned)
-      );
-
-      setDepthLoaded(true);
-
+      console.error('Error fetching schedule:', error);
       return;
     }
 
-    const defaults =
-      createDefaultAssignments(
-        currentPlayers
-      );
-
-    setDepthAssignments(defaults);
-
-    localStorage.setItem(
-      DEPTH_STORAGE_KEY,
-      JSON.stringify(defaults)
-    );
-
-    setDepthLoaded(true);
-  }
-
-  function createDefaultAssignments(
-    currentPlayers: Player[]
-  ): DepthAssignments {
-    const assignments: DepthAssignments = {};
-
-    ALL_DEPTH_SLOTS.forEach((slot) => {
-      assignments[slot.id] = [];
-    });
-
-    const byPosition = (
-      position: string
-    ) =>
-      currentPlayers.filter(
-        (player) =>
-          player.position === position
-      );
-
-    const qbs = byPosition('QB');
-
-    assignments.QB = qbs.map(
-      (player) => player.id
-    );
-
-    const rbs = byPosition('RB');
-
-    assignments.RB = rbs.map(
-      (player) => player.id
-    );
-
-    const wrs = byPosition('WR');
-
-    wrs.forEach((player, index) => {
-      const slots = ['X', 'Y', 'Z'];
-
-      const slot =
-        slots[index % slots.length];
-
-      assignments[slot].push(
-        player.id
-      );
-    });
-
-    const tes = byPosition('TE');
-
-    assignments.TE = tes.map(
-      (player) => player.id
-    );
-
-    const ols = byPosition('OL');
-
-    ols.forEach((player, index) => {
-      const slots = [
-        'OT',
-        'G1',
-        'C',
-        'G2',
-        'T',
-      ];
-
-      const slot =
-        slots[index % slots.length];
-
-      assignments[slot].push(
-        player.id
-      );
-    });
-
-    const des = byPosition('DE');
-
-    des.forEach((player, index) => {
-      assignments[
-        index % 2 === 0
-          ? 'DE1'
-          : 'DE2'
-      ].push(player.id);
-    });
-
-    const dts = byPosition('DT');
-
-    dts.forEach((player, index) => {
-      assignments[
-        index % 2 === 0
-          ? 'DT1'
-          : 'DT2'
-      ].push(player.id);
-    });
-
-    const lbs = byPosition('LB');
-
-    lbs.forEach((player, index) => {
-      const slots = [
-        'WILL',
-        'MIKE',
-        'SAM',
-      ];
-
-      const slot =
-        slots[index % slots.length];
-
-      assignments[slot].push(
-        player.id
-      );
-    });
-
-    const cbs = byPosition('CB');
-
-    cbs.forEach((player, index) => {
-      assignments[
-        index % 2 === 0
-          ? 'CB'
-          : 'NICKLE'
-      ].push(player.id);
-    });
-
-    const safeties = byPosition('S');
-
-    safeties.forEach((player, index) => {
-      const slots = [
-        'SS',
-        'FS',
-        'NICKLE',
-      ];
-
-      const slot =
-        slots[index % slots.length];
-
-      assignments[slot].push(
-        player.id
-      );
-    });
-
-    assignments.K = byPosition('K').map(
-      (player) => player.id
-    );
-
-    assignments.P = byPosition('P').map(
-      (player) => player.id
-    );
-
-    assignments.LS = byPosition('LS').map(
-      (player) => player.id
-    );
-
-    return assignments;
-  }
-
-  function saveDepthAssignments(
-    assignments: DepthAssignments
-  ) {
-    setDepthAssignments(assignments);
-
-    try {
-      localStorage.setItem(
-        DEPTH_STORAGE_KEY,
-        JSON.stringify(assignments)
-      );
-    } catch (error) {
-      console.error(
-        'Error saving depth chart:',
-        error
-      );
-    }
-  }
-
-  function resetDepthChart() {
-    if (
-      !window.confirm(
-        'Reset the entire depth chart to the default arrangement?'
-      )
-    ) {
-      return;
-    }
-
-    const defaults =
-      createDefaultAssignments(players);
-
-    saveDepthAssignments(defaults);
-  }
-
-  function getPlayerById(id: number) {
-    return players.find(
-      (player) => player.id === id
-    );
-  }
-
-  function getPlayerSlot(
-    playerId: number
-  ): DepthSlot | null {
-    const slot =
-      ALL_DEPTH_SLOTS.find((slot) =>
-        (
-          depthAssignments[slot.id] || []
-        ).includes(playerId)
-      );
-
-    return slot || null;
-  }
-
-  function getDepthNumber(
-    slotId: string,
-    playerId: number
-  ) {
-    const playersInSlot =
-      depthAssignments[slotId] || [];
-
-    const index =
-      playersInSlot.indexOf(playerId);
-
-    return index >= 0
-      ? index + 1
-      : null;
-  }
-
-  function canPlayerEnterSlot(
-    player: Player,
-    slot: DepthSlot
-  ) {
-    return slot.eligiblePositions.includes(
-      player.position
-    );
-  }
-
-  function removePlayerFromAllSlots(
-    assignments: DepthAssignments,
-    playerId: number
-  ): DepthAssignments {
-    const next: DepthAssignments = {};
-
-    ALL_DEPTH_SLOTS.forEach((slot) => {
-      next[slot.id] = (
-        assignments[slot.id] || []
-      ).filter(
-        (id) => id !== playerId
-      );
-    });
-
-    return next;
-  }
-
-  function movePlayerToSlot(
-    playerId: number,
-    targetSlotId: string,
-    targetIndex?: number
-  ) {
-    const player =
-      getPlayerById(playerId);
-
-    if (!player) return;
-
-    const targetSlot =
-      ALL_DEPTH_SLOTS.find(
-        (slot) =>
-          slot.id === targetSlotId
-      );
-
-    if (!targetSlot) return;
-
-    if (
-      !canPlayerEnterSlot(
-        player,
-        targetSlot
-      )
-    ) {
-      return;
-    }
-
-    let next =
-      removePlayerFromAllSlots(
-        depthAssignments,
-        playerId
-      );
-
-    const targetPlayers = [
-      ...(next[targetSlotId] || []),
-    ];
-
-    let insertIndex =
-      typeof targetIndex === 'number'
-        ? targetIndex
-        : targetPlayers.length;
-
-    insertIndex = Math.max(
-      0,
-      Math.min(
-        insertIndex,
-        targetPlayers.length
-      )
-    );
-
-    targetPlayers.splice(
-      insertIndex,
-      0,
-      playerId
-    );
-
-    next[targetSlotId] =
-      targetPlayers;
-
-    saveDepthAssignments(next);
-  }
-
-  function handleDragStart(
-    playerId: number,
-    sourceSlotId: string | null
-  ) {
-    setDraggedPlayer({
-      playerId,
-      sourceSlotId,
-    });
-  }
-
-  function handleDragEnd() {
-    setDraggedPlayer(null);
-  }
-
-  function handleDropOnSlot(
-    slotId: string
-  ) {
-    if (!draggedPlayer) return;
-
-    movePlayerToSlot(
-      draggedPlayer.playerId,
-      slotId
-    );
-
-    setDraggedPlayer(null);
-  }
-
-  function handleDropOnPlayer(
-    slotId: string,
-    targetPlayerId: number
-  ) {
-    if (!draggedPlayer) return;
-
-    if (
-      draggedPlayer.playerId ===
-      targetPlayerId
-    ) {
-      setDraggedPlayer(null);
-      return;
-    }
-
-    const targetPlayers = [
-      ...(depthAssignments[slotId] || []),
-    ];
-
-    const targetIndex =
-      targetPlayers.indexOf(
-        targetPlayerId
-      );
-
-    movePlayerToSlot(
-      draggedPlayer.playerId,
-      slotId,
-      targetIndex >= 0
-        ? targetIndex
-        : targetPlayers.length
-    );
-
-    setDraggedPlayer(null);
+    setSchedule((data || []) as Game[]);
   }
 
   async function saveNotes(id: number) {
     const { error } = await supabase
       .from('players')
-      .update({
-        notes: tempNotes,
-      })
+      .update({ notes: tempNotes })
       .eq('id', id);
 
-    if (!error) {
-      setPlayers(
-        players.map((player) =>
-          player.id === id
-            ? {
-                ...player,
-                notes: tempNotes,
-              }
-            : player
-        )
-      );
-
-      setEditingNotesId(null);
+    if (error) {
+      console.error('Error saving notes:', error);
+      return;
     }
+
+    setPlayers((currentPlayers) =>
+      currentPlayers.map((player) =>
+        player.id === id
+          ? { ...player, notes: tempNotes }
+          : player
+      )
+    );
+
+    setEditingNotesId(null);
   }
 
-  const handleSortToggle = (
-    field: 'number' | 'name'
-  ) => {
+  function handleSortToggle(field: 'number' | 'name') {
     if (sortBy === field) {
-      setSortOrder(
-        sortOrder === 'asc'
-          ? 'desc'
-          : 'asc'
+      setSortOrder((currentOrder) =>
+        currentOrder === 'asc' ? 'desc' : 'asc'
       );
     } else {
       setSortBy(field);
       setSortOrder('asc');
     }
-  };
+  }
 
   const filteredPlayers = players
     .filter((player) => {
-      const matchesPos =
+      const matchesPosition =
         selectedPosition === 'ALL' ||
-        player.position ===
-          selectedPosition;
+        player.position === selectedPosition;
 
       const matchesSearch =
         player.name
           .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          ) ||
-        player.number
-          .toString()
-          .includes(search);
+          .includes(search.toLowerCase()) ||
+        player.number.toString().includes(search);
 
-      return (
-        matchesPos &&
-        matchesSearch
-      );
+      return matchesPosition && matchesSearch;
     })
     .sort((a, b) => {
       let comparison = 0;
 
       if (sortBy === 'number') {
-        comparison =
-          a.number - b.number;
+        comparison = a.number - b.number;
       } else {
-        comparison =
-          a.name.localeCompare(
-            b.name
-          );
+        comparison = a.name.localeCompare(b.name);
       }
 
       return sortOrder === 'asc'
@@ -847,398 +359,155 @@ cleaned[slot.id] = ids.filter(
         : -comparison;
     });
 
-  const filteredStaff =
-    staff.filter(
-      (member) =>
-        member.name
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          ) ||
-        member.title
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          )
-    );
+  const filteredStaff = staff.filter(
+    (member) =>
+      member.name
+        .toLowerCase()
+        .includes(search.toLowerCase()) ||
+      member.title
+        .toLowerCase()
+        .includes(search.toLowerCase())
+  );
 
-  function getEditorSlotsForPosition(
-    position: string
-  ) {
-    switch (position) {
-      case 'QB':
-        return ['QB'];
-
-      case 'RB':
-        return ['RB'];
-
-      case 'WR':
-        return ['X', 'Y', 'Z'];
-
-      case 'TE':
-        return ['TE'];
-
-      case 'OL':
-        return [
-          'OT',
-          'G1',
-          'C',
-          'G2',
-          'T',
-        ];
-
-      case 'DE':
-        return ['DE1', 'DE2'];
-
-      case 'DT':
-        return ['DT1', 'DT2'];
-
-      case 'LB':
-        return [
-          'WILL',
-          'MIKE',
-          'SAM',
-        ];
-
-      case 'CB':
-        return [
-          'CB',
-          'NICKLE',
-        ];
-
-      case 'S':
-        return [
-          'SS',
-          'FS',
-          'NICKLE',
-        ];
-
-      case 'K':
-        return ['K'];
-
-      case 'P':
-        return ['P'];
-
-      case 'LS':
-        return ['LS'];
-
-      default:
-        return [];
+  function initializeDepthAssignments() {
+    if (players.length === 0) {
+      return;
     }
-  }
 
-  function getAvailablePlayers(
-    position: string
-  ) {
-    return players
-      .filter(
-        (player) =>
-          player.position ===
-          position
-      )
-      .sort((a, b) =>
-        a.name.localeCompare(
-          b.name
-        )
-      );
-  }
+    const validPlayerIds = new Set(
+      players.map((player) => player.id)
+    );
 
-  function renderPlayerCard(
-    player: Player,
-    slotId: string | null,
-    compact = false
-  ) {
-    const currentSlot =
-      getPlayerSlot(player.id);
+    let saved: DepthAssignments | null = null;
 
-    const depthNumber = slotId
-      ? getDepthNumber(
-          slotId,
-          player.id
-        )
-      : null;
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem(
+          'psu-football-depth-chart-v2'
+        );
 
-    return (
-      <div
-        key={player.id}
-        draggable
-        onDragStart={() =>
-          handleDragStart(
-            player.id,
-            slotId
-          )
-        }
-        onDragEnd={handleDragEnd}
-        onDragOver={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
+        if (stored) {
+          const parsed = JSON.parse(stored);
 
-          if (slotId) {
-            handleDropOnPlayer(
-              slotId,
-              player.id
-            );
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            !Array.isArray(parsed)
+          ) {
+            saved = parsed as DepthAssignments;
           }
-        }}
-        className={`group cursor-grab rounded-lg border border-white/10 bg-slate-900/80 transition hover:border-blue-400/40 hover:bg-blue-500/[0.08] ${
-          compact
-            ? 'px-3 py-2'
-            : 'px-3 py-2.5'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          {depthNumber !== null ? (
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-blue-500/20 text-xs font-bold text-blue-300">
-              {depthNumber}
-            </div>
-          ) : (
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center text-slate-600">
-              +
-            </div>
-          )}
+        }
+      } catch (error) {
+        console.error(
+          'Error loading depth chart:',
+          error
+        );
+      }
+    }
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-slate-500">
-                #{player.number}
-              </span>
+    const cleaned: DepthAssignments = {};
 
-              <Link
-                href={`/player/${player.id}`}
-                onClick={(event) =>
-                  event.stopPropagation()
-                }
-                className="truncate text-sm font-semibold text-white hover:text-blue-300 hover:underline"
-              >
-                {player.name}
-              </Link>
-            </div>
+    ALL_DEPTH_SLOTS.forEach((slot) => {
+      const ids: number[] =
+        saved && Array.isArray(saved[slot.id])
+          ? saved[slot.id]
+          : [];
 
-            {!compact && (
-              <div className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-500">
-                <span>
-                  {player.position}
-                </span>
-
-                {currentSlot && (
-                  <>
-                    <span>•</span>
-
-                    <span className="text-blue-400">
-                      {
-                        currentSlot.label
-                      }
-                    </span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          <span className="text-slate-600 transition group-hover:text-blue-400">
-            ⋮⋮
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  function renderDepthSlot(
-    slot: DepthSlot,
-    compact = false
-  ) {
-    const playerIds =
-      depthAssignments[slot.id] ||
-      [];
-
-    return (
-      <div
-        key={slot.id}
-        onDragOver={(event) => {
-          event.preventDefault();
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          handleDropOnSlot(
-            slot.id
-          );
-        }}
-        className={`flex min-h-[190px] flex-col rounded-xl border border-white/10 bg-slate-950/50 p-3 transition ${
-          draggedPlayer
-            ? 'hover:border-blue-400/60 hover:bg-blue-500/[0.05]'
-            : ''
-        } ${
-          compact
-            ? 'min-w-[190px]'
-            : ''
-        }`}
-      >
-        <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
-          <div>
-            <h3 className="text-sm font-black uppercase tracking-wider text-white">
-              {slot.label}
-            </h3>
-
-            <p className="text-[9px] uppercase tracking-widest text-slate-600">
-              {
-                playerIds.length
-              }{' '}
-              players
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          {playerIds.length ===
-          0 ? (
-            <div className="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-slate-700/70 text-center text-[10px] uppercase tracking-wider text-slate-600">
-              Drop player here
-            </div>
-          ) : (
-            playerIds.map(
-              (playerId) => {
-                const player =
-                  getPlayerById(
-                    playerId
-                  );
-
-                if (!player)
-                  return null;
-
-                return renderPlayerCard(
-                  player,
-                  slot.id,
-                  compact
-                );
-              }
-            )
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function renderPositionEditor(
-    position: string
-  ) {
-    const slots =
-      getEditorSlotsForPosition(
-        position
+      cleaned[slot.id] = ids.filter(
+        (id, index, array) =>
+          validPlayerIds.has(id) &&
+          array.indexOf(id) === index
       );
+    });
 
-    const availablePlayers =
-      getAvailablePlayers(
-        position
-      );
-
-    return (
-      <div className="space-y-5">
-        <div className="glass-panel rounded-2xl p-5">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-              <h2 className="text-xl font-bold text-white">
-                {position} Depth
-                Chart
-              </h2>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Drag players from
-                the pool into a
-                position. Drag within
-                a position to set
-                1st, 2nd, and 3rd
-                string.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-300">
-              {
-                availablePlayers.length
-              }{' '}
-              {position}
-              {availablePlayers.length ===
-              1
-                ? ''
-                : 's'}{' '}
-              on roster
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-[250px_1fr]">
-          <div className="glass-panel rounded-2xl p-4">
-            <div className="mb-3">
-              <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                Player Pool
-              </h3>
-
-              <p className="mt-1 text-[10px] leading-4 text-slate-600">
-                Drag any {position}{' '}
-                into a position on
-                the right.
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              {availablePlayers.map(
-                (player) =>
-                  renderPlayerCard(
-                    player,
-                    null,
-                    true
-                  )
-              )}
-            </div>
-          </div>
-
-          <div
-            className={`grid gap-3 ${
-              slots.length <= 3
-                ? 'md:grid-cols-3'
-                : slots.length <= 5
-                  ? 'md:grid-cols-3 xl:grid-cols-5'
-                  : 'md:grid-cols-3 xl:grid-cols-4'
-            }`}
-          >
-            {slots.map(
-              (slotId) => {
-                const slot =
-                  ALL_DEPTH_SLOTS.find(
-                    (item) =>
-                      item.id ===
-                      slotId
-                  );
-
-                if (!slot)
-                  return null;
-
-                return renderDepthSlot(
-                  slot,
-                  true
-                );
-              }
-            )}
-          </div>
-        </div>
-      </div>
+    const assignedIds = new Set(
+      Object.values(cleaned).flat()
     );
+
+    const unassignedPlayers = players.filter(
+      (player) => !assignedIds.has(player.id)
+    );
+
+    const addToSlot = (
+      slotId: string,
+      player: Player
+    ) => {
+      if (!cleaned[slotId]) {
+        cleaned[slotId] = [];
+      }
+
+      if (!cleaned[slotId].includes(player.id)) {
+        cleaned[slotId].push(player.id);
+        assignedIds.add(player.id);
+      }
+    };
+
+    const addPlayersToSlots = (
+      playerPosition: string,
+      slotIds: string[]
+    ) => {
+      const availablePlayers =
+        unassignedPlayers.filter(
+          (player) =>
+            player.position === playerPosition &&
+            !assignedIds.has(player.id)
+        );
+
+      availablePlayers.forEach((player, index) => {
+        const slotId =
+          slotIds[index % slotIds.length];
+
+        addToSlot(slotId, player);
+      });
+    };
+
+    addPlayersToSlots('QB', ['QB']);
+    addPlayersToSlots('RB', ['RB']);
+    addPlayersToSlots('WR', ['X', 'Y', 'Z']);
+    addPlayersToSlots('TE', ['TE']);
+    addPlayersToSlots(
+      'OL',
+      ['OT', 'G1', 'C', 'G2', 'T']
+    );
+
+    addPlayersToSlots('DE', ['DE1', 'DE2']);
+    addPlayersToSlots('DT', ['DT1', 'DT2']);
+    addPlayersToSlots(
+      'LB',
+      ['WILL', 'MIKE', 'SAM']
+    );
+    addPlayersToSlots(
+      'CB',
+      ['CB', 'NICKLE']
+    );
+    addPlayersToSlots(
+      'S',
+      ['SS', 'FS', 'NICKLE']
+    );
+
+    addPlayersToSlots('K', ['K']);
+    addPlayersToSlots('P', ['P']);
+    addPlayersToSlots('LS', ['LS']);
+
+    setDepthAssignments(cleaned);
   }
 
-  /*
-   * Returns ONLY players who belong to
-   * the selected side of the ball AND
-   * are not currently assigned anywhere
-   * on the depth chart.
-   */
+  function getSlotsForTab(
+    tab: DepthChartTab
+  ): DepthSlot[] {
+    if (tab === 'offense') {
+      return OFFENSE_SLOTS;
+    }
+
+    if (tab === 'defense') {
+      return DEFENSE_SLOTS;
+    }
+
+    return SPECIAL_TEAMS_SLOTS;
+  }
+
   function getDepthChartPlayers(
-    tab:
-      | 'offense'
-      | 'defense'
-      | 'special-teams'
+    tab: DepthChartTab
   ) {
     let positionPool: string[] = [];
 
@@ -1266,24 +535,324 @@ cleaned[slot.id] = ids.filter(
       ];
     }
 
-    const assignedPlayerIds =
-      new Set(
-        Object.values(
-          depthAssignments
-        ).flat()
+    const assignedPlayerIds = new Set(
+      Object.values(depthAssignments).flat()
+    );
+
+    return players.filter(
+      (player) =>
+        positionPool.includes(player.position) &&
+        !assignedPlayerIds.has(player.id)
+    );
+  }
+
+  function getPlayerById(
+    playerId: number
+  ): Player | undefined {
+    return players.find(
+      (player) => player.id === playerId
+    );
+  }
+
+  function playerCanEnterSlot(
+    player: Player,
+    slot: DepthSlot
+  ) {
+    return slot.eligiblePositions.includes(
+      player.position
+    );
+  }
+
+  function removePlayerFromAllSlots(
+    playerId: number,
+    assignments: DepthAssignments
+  ) {
+    Object.keys(assignments).forEach((slotId) => {
+      assignments[slotId] =
+        assignments[slotId].filter(
+          (id) => id !== playerId
+        );
+    });
+  }
+
+  function movePlayerToSlot(
+    playerId: number,
+    slotId: string,
+    targetIndex?: number
+  ) {
+    const slot = ALL_DEPTH_SLOTS.find(
+      (item) => item.id === slotId
+    );
+
+    const player = getPlayerById(playerId);
+
+    if (!slot || !player) {
+      return;
+    }
+
+    if (!playerCanEnterSlot(player, slot)) {
+      return;
+    }
+
+    setDepthAssignments((currentAssignments) => {
+      const nextAssignments: DepthAssignments = {};
+
+      Object.keys(currentAssignments).forEach(
+        (key) => {
+          nextAssignments[key] = [
+            ...(currentAssignments[key] || []),
+          ];
+        }
       );
 
-    return players
-      .filter(
-        (player) =>
-          positionPool.includes(
-            player.position
-          ) &&
-          !assignedPlayerIds.has(
-            player.id
+      ALL_DEPTH_SLOTS.forEach((item) => {
+        if (!nextAssignments[item.id]) {
+          nextAssignments[item.id] = [];
+        }
+      });
+
+      removePlayerFromAllSlots(
+        playerId,
+        nextAssignments
+      );
+
+      const destination =
+        nextAssignments[slotId] || [];
+
+      const insertAt =
+        typeof targetIndex === 'number'
+          ? Math.max(
+              0,
+              Math.min(
+                targetIndex,
+                destination.length
+              )
+            )
+          : destination.length;
+
+      destination.splice(insertAt, 0, playerId);
+
+      nextAssignments[slotId] = destination;
+
+      return nextAssignments;
+    });
+  }
+
+  function handleDragStart(
+    playerId: number,
+    fromSlot: string | null
+  ) {
+    setDraggedPlayerId(playerId);
+    setDraggedFromSlot(fromSlot);
+  }
+
+  function handleDragEnd() {
+    setDraggedPlayerId(null);
+    setDraggedFromSlot(null);
+  }
+
+  function handleDropOnSlot(
+    slotId: string,
+    event: React.DragEvent<HTMLDivElement>
+  ) {
+    event.preventDefault();
+
+    if (draggedPlayerId === null) {
+      return;
+    }
+
+    movePlayerToSlot(
+      draggedPlayerId,
+      slotId
+    );
+
+    handleDragEnd();
+  }
+
+  function handleDropOnPlayer(
+    slotId: string,
+    targetIndex: number,
+    event: React.DragEvent<HTMLDivElement>
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (draggedPlayerId === null) {
+      return;
+    }
+
+    movePlayerToSlot(
+      draggedPlayerId,
+      slotId,
+      targetIndex
+    );
+
+    handleDragEnd();
+  }
+
+  function renderPlayerCard(
+    player: Player,
+    fromSlot: string | null,
+    compact = false
+  ) {
+    return (
+      <div
+        key={player.id}
+        draggable
+        onDragStart={(event) => {
+          event.stopPropagation();
+          handleDragStart(
+            player.id,
+            fromSlot
+          );
+        }}
+        onDragEnd={handleDragEnd}
+        className={`cursor-grab rounded-xl border border-white/10 bg-slate-900/90 transition hover:border-blue-400/50 hover:bg-slate-800/90 active:cursor-grabbing ${
+          compact
+            ? 'p-3'
+            : 'p-4'
+        } ${
+          draggedPlayerId === player.id
+            ? 'opacity-40'
+            : ''
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 font-mono text-sm font-bold text-blue-300">
+            #{player.number}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold text-white">
+              {player.name}
+            </div>
+
+            <div className="mt-0.5 text-xs text-slate-500">
+              {player.position}
+              {player.eligibility
+                ? ` • ${player.eligibility}`
+                : ''}
+            </div>
+          </div>
+
+          <div className="text-slate-600">
+            ⋮⋮
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderDepthSlot(
+    slot: DepthSlot
+  ) {
+    const assignedIds =
+      depthAssignments[slot.id] || [];
+
+    return (
+      <div
+        key={slot.id}
+        onDragOver={(event) => {
+          event.preventDefault();
+        }}
+        onDrop={(event) =>
+          handleDropOnSlot(
+            slot.id,
+            event
           )
-      )
-      .sort(
+        }
+        className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Position
+            </div>
+
+            <div className="text-lg font-bold text-white">
+              {slot.label}
+            </div>
+          </div>
+
+          <div className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            {slot.eligiblePositions.join(' / ')}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {assignedIds.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-5 text-center text-xs text-slate-600">
+              Drag player here
+            </div>
+          ) : (
+            assignedIds.map(
+              (playerId, index) => {
+                const player =
+                  getPlayerById(playerId);
+
+                if (!player) {
+                  return null;
+                }
+
+                return (
+                  <div
+                    key={`${slot.id}-${player.id}`}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                    }}
+                    onDrop={(event) =>
+                      handleDropOnPlayer(
+                        slot.id,
+                        index,
+                        event
+                      )
+                    }
+                  >
+                    <div className="mb-1 ml-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                      {index === 0
+                        ? '1st String'
+                        : index === 1
+                          ? '2nd String'
+                          : index === 2
+                            ? '3rd String'
+                            : `${index + 1}th String`}
+                    </div>
+
+                    {renderPlayerCard(
+                      player,
+                      slot.id,
+                      true
+                    )}
+                  </div>
+                );
+              }
+            )
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function resetDepthChart() {
+    if (
+      typeof window !== 'undefined'
+    ) {
+      window.localStorage.removeItem(
+        'psu-football-depth-chart-v2'
+      );
+    }
+
+    setDepthAssignments({});
+  }
+
+  function renderDepthChart() {
+    const slots =
+      getSlotsForTab(depthChartTab);
+
+    const availablePlayers =
+      getDepthChartPlayers(
+        depthChartTab
+      ).sort(
         (a, b) =>
           a.position.localeCompare(
             b.position
@@ -1292,64 +861,319 @@ cleaned[slot.id] = ids.filter(
             b.name
           )
       );
+
+    return (
+      <div className="space-y-6">
+        <div className="glass-panel rounded-2xl p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                Depth Chart
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-400">
+                Drag players into position
+                groups and arrange them by
+                string.
+              </p>
+            </div>
+
+            <button
+              onClick={resetDepthChart}
+              className="rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/20"
+            >
+              Reset Depth Chart
+            </button>
+          </div>
+
+          <div className="mt-5 flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5">
+            <button
+              onClick={() =>
+                setDepthChartTab(
+                  'offense'
+                )
+              }
+              className={`flex-1 whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+                depthChartTab ===
+                'offense'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              Offense
+            </button>
+
+            <button
+              onClick={() =>
+                setDepthChartTab(
+                  'defense'
+                )
+              }
+              className={`flex-1 whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+                depthChartTab ===
+                'defense'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              Defense
+            </button>
+
+            <button
+              onClick={() =>
+                setDepthChartTab(
+                  'special-teams'
+                )
+              }
+              className={`flex-1 whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+                depthChartTab ===
+                'special-teams'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              Special Teams
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
+          <div className="glass-panel rounded-2xl p-4">
+            <div className="mb-4">
+              <h3 className="font-bold text-white">
+                Available Players
+              </h3>
+
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Players disappear from this
+                list once assigned to a
+                position.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {availablePlayers.length ===
+              0 ? (
+                <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-6 text-center text-xs text-slate-600">
+                  All eligible players
+                  are assigned.
+                </div>
+              ) : (
+                availablePlayers.map(
+                  (player) =>
+                    renderPlayerCard(
+                      player,
+                      null,
+                      true
+                    )
+                )
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {slots.map((slot) =>
+              renderDepthSlot(slot)
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  function getCurrentDepthSlots() {
-    if (
-      depthChartTab === 'offense'
-    ) {
-      return OFFENSE_SLOTS;
+  function renderPositionEditor(
+    position: string
+  ) {
+    let relevantSlots: DepthSlot[] = [];
+
+    if (position === 'QB') {
+      relevantSlots = OFFENSE_SLOTS.filter(
+        (slot) => slot.id === 'QB'
+      );
+    } else if (position === 'RB') {
+      relevantSlots = OFFENSE_SLOTS.filter(
+        (slot) => slot.id === 'RB'
+      );
+    } else if (position === 'WR') {
+      relevantSlots =
+        OFFENSE_SLOTS.filter(
+          (slot) =>
+            slot.eligiblePositions.includes(
+              'WR'
+            )
+        );
+    } else if (position === 'TE') {
+      relevantSlots = OFFENSE_SLOTS.filter(
+        (slot) => slot.id === 'TE'
+      );
+    } else if (position === 'OL') {
+      relevantSlots =
+        OFFENSE_SLOTS.filter(
+          (slot) =>
+            slot.eligiblePositions.includes(
+              'OL'
+            )
+        );
+    } else if (position === 'DE') {
+      relevantSlots =
+        DEFENSE_SLOTS.filter(
+          (slot) =>
+            slot.eligiblePositions.includes(
+              'DE'
+            )
+        );
+    } else if (position === 'DT') {
+      relevantSlots =
+        DEFENSE_SLOTS.filter(
+          (slot) =>
+            slot.eligiblePositions.includes(
+              'DT'
+            )
+        );
+    } else if (position === 'LB') {
+      relevantSlots =
+        DEFENSE_SLOTS.filter(
+          (slot) =>
+            slot.eligiblePositions.includes(
+              'LB'
+            )
+        );
+    } else if (position === 'CB') {
+      relevantSlots =
+        DEFENSE_SLOTS.filter(
+          (slot) =>
+            slot.eligiblePositions.includes(
+              'CB'
+            )
+        );
+    } else if (position === 'S') {
+      relevantSlots =
+        DEFENSE_SLOTS.filter(
+          (slot) =>
+            slot.eligiblePositions.includes(
+              'S'
+            )
+        );
+    } else if (position === 'K') {
+      relevantSlots = SPECIAL_TEAMS_SLOTS.filter(
+        (slot) => slot.id === 'K'
+      );
+    } else if (position === 'P') {
+      relevantSlots = SPECIAL_TEAMS_SLOTS.filter(
+        (slot) => slot.id === 'P'
+      );
+    } else if (position === 'LS') {
+      relevantSlots = SPECIAL_TEAMS_SLOTS.filter(
+        (slot) => slot.id === 'LS'
+      );
     }
 
-    if (
-      depthChartTab === 'defense'
-    ) {
-      return DEFENSE_SLOTS;
-    }
+    const positionPlayers =
+      players.filter(
+        (player) =>
+          player.position === position
+      );
 
-    return SPECIAL_TEAMS_SLOTS;
-  }
+    const assignedToRelevantSlots =
+      new Set(
+        relevantSlots.flatMap(
+          (slot) =>
+            depthAssignments[
+              slot.id
+            ] || []
+        )
+      );
 
-  function getCurrentTabTitle() {
-    if (
-      depthChartTab === 'offense'
-    ) {
-      return 'Offense Depth Chart';
-    }
+    const availablePlayers =
+      positionPlayers.filter(
+        (player) =>
+          !assignedToRelevantSlots.has(
+            player.id
+          )
+      );
 
-    if (
-      depthChartTab === 'defense'
-    ) {
-      return 'Defense Depth Chart';
-    }
+    return (
+      <div className="space-y-6">
+        <div className="glass-panel rounded-2xl p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                {position} Depth Chart
+              </h2>
 
-    return 'Special Teams Depth Chart';
+              <p className="text-sm text-slate-400">
+                Drag players into the
+                appropriate role.
+              </p>
+            </div>
+
+            <div className="text-xs text-slate-500">
+              {positionPlayers.length}{' '}
+              players on roster
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
+          <div className="glass-panel rounded-2xl p-4">
+            <div className="mb-4">
+              <h3 className="font-bold text-white">
+                Available {position}
+              </h3>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Drag a player into a role.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {availablePlayers.length ===
+              0 ? (
+                <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-6 text-center text-xs text-slate-600">
+                  All players assigned.
+                </div>
+              ) : (
+                availablePlayers.map(
+                  (player) =>
+                    renderPlayerCard(
+                      player,
+                      null,
+                      true
+                    )
+                )
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {relevantSlots.map((slot) =>
+              renderDepthSlot(slot)
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
       <header className="mx-auto mb-8 max-w-7xl">
         <h1 className="mb-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          2026 Football
-          Dashboard
+          2026 Football Dashboard
         </h1>
 
         <p className="max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-          Manage player roster,
-          coaching personnel, depth
-          chart, scouting notes, and
-          schedule.
+          Manage player roster, scouting
+          notes, coaching personnel,
+          schedule, and depth chart.
         </p>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6">
-        {/* MAIN NAVIGATION */}
         <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur sm:w-fit">
           <button
             onClick={() =>
-              setActiveTab(
-                'roster'
-              )
+              setActiveTab('roster')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
               activeTab === 'roster'
@@ -1362,13 +1186,10 @@ cleaned[slot.id] = ids.filter(
 
           <button
             onClick={() =>
-              setActiveTab(
-                'coaching'
-              )
+              setActiveTab('coaching')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab ===
-              'coaching'
+              activeTab === 'coaching'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1378,13 +1199,10 @@ cleaned[slot.id] = ids.filter(
 
           <button
             onClick={() =>
-              setActiveTab(
-                'schedule'
-              )
+              setActiveTab('schedule')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab ===
-              'schedule'
+              activeTab === 'schedule'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1394,13 +1212,10 @@ cleaned[slot.id] = ids.filter(
 
           <button
             onClick={() =>
-              setActiveTab(
-                'depth-chart'
-              )
+              setActiveTab('depth-chart')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab ===
-              'depth-chart'
+              activeTab === 'depth-chart'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1409,34 +1224,72 @@ cleaned[slot.id] = ids.filter(
           </button>
         </div>
 
-        {/* PLAYER ROSTER */}
         {activeTab === 'roster' && (
           <>
             <div className="glass-panel flex flex-col items-center justify-between gap-4 rounded-2xl p-4 md:flex-row">
               <div className="flex flex-wrap items-center gap-1">
-                {POSITIONS.map(
-                  (position) => (
-                    <button
-                      key={position}
-                      onClick={() =>
-                        setSelectedPosition(
-                          position
-                        )
-                      }
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                        selectedPosition ===
+                {POSITIONS.map((position) => (
+                  <button
+                    key={position}
+                    onClick={() =>
+                      setSelectedPosition(
                         position
-                          ? 'border-blue-400/30 bg-blue-500/20 text-blue-100 shadow-sm shadow-blue-950/30'
-                          : 'border-transparent bg-white/[0.04] text-slate-400 hover:border-white/10 hover:bg-white/[0.08] hover:text-slate-100'
-                      }`}
-                    >
-                      {position}
-                    </button>
-                  )
-                )}
+                      )
+                    }
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                      selectedPosition ===
+                      position
+                        ? 'border-blue-400/30 bg-blue-500/20 text-blue-100 shadow-sm shadow-blue-950/30'
+                        : 'border-transparent bg-white/[0.04] text-slate-400 hover:border-white/10 hover:bg-white/[0.08] hover:text-slate-100'
+                    }`}
+                  >
+                    {position}
+                  </button>
+                ))}
               </div>
 
               <div className="flex w-full items-center gap-3 md:w-auto">
+                <div className="flex items-center rounded-lg border border-white/10 bg-white/[0.04] p-1">
+                  <button
+                    onClick={() =>
+                      handleSortToggle(
+                        'number'
+                      )
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                      sortBy === 'number'
+                        ? 'bg-blue-500/20 text-blue-300'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    # {sortBy === 'number' &&
+                      (sortOrder ===
+                      'asc'
+                        ? '↑'
+                        : '↓')}
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      handleSortToggle(
+                        'name'
+                      )
+                    }
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                      sortBy === 'name'
+                        ? 'bg-blue-500/20 text-blue-300'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Name{' '}
+                    {sortBy === 'name' &&
+                      (sortOrder ===
+                      'asc'
+                        ? '↑'
+                        : '↓')}
+                  </button>
+                </div>
+
                 <input
                   type="text"
                   placeholder="Search name or jersey #..."
@@ -1465,13 +1318,12 @@ cleaned[slot.id] = ids.filter(
                           )
                         }
                       >
-                        #
-                        {sortBy ===
+                        # {sortBy ===
                           'number' &&
                           (sortOrder ===
                           'asc'
-                            ? ' ↑'
-                            : ' ↓')}
+                            ? '↑'
+                            : '↓')}
                       </th>
 
                       <th
@@ -1482,13 +1334,13 @@ cleaned[slot.id] = ids.filter(
                           )
                         }
                       >
-                        Name
+                        Name{' '}
                         {sortBy ===
                           'name' &&
                           (sortOrder ===
                           'asc'
-                            ? ' ↑'
-                            : ' ↓')}
+                            ? '↑'
+                            : '↓')}
                       </th>
 
                       <th className="p-4">
@@ -1504,8 +1356,7 @@ cleaned[slot.id] = ids.filter(
                       </th>
 
                       <th className="p-4">
-                        Hometown / Prev.
-                        School
+                        Hometown / Prev. School
                       </th>
 
                       <th className="w-72 p-4">
@@ -1518,16 +1369,11 @@ cleaned[slot.id] = ids.filter(
                     {filteredPlayers.map(
                       (player) => (
                         <tr
-                          key={
-                            player.id
-                          }
+                          key={player.id}
                           className="transition hover:bg-blue-500/[0.04]"
                         >
                           <td className="p-4 font-mono font-bold text-slate-400">
-                            #
-                            {
-                              player.number
-                            }
+                            #{player.number}
                           </td>
 
                           <td className="p-4 font-semibold text-white">
@@ -1535,34 +1381,23 @@ cleaned[slot.id] = ids.filter(
                               href={`/player/${player.id}`}
                               className="text-blue-400 transition hover:text-blue-300 hover:underline"
                             >
-                              {
-                                player.name
-                              }
+                              {player.name}
                             </Link>
                           </td>
 
                           <td className="p-4">
                             <span className="rounded-md border border-blue-400/15 bg-blue-500/10 px-2 py-1 text-xs font-bold text-blue-300">
-                              {
-                                player.position
-                              }
+                              {player.position}
                             </span>
                           </td>
 
                           <td className="p-4 text-slate-300">
-                            {
-                              player.eligibility
-                            }
+                            {player.eligibility}
                           </td>
 
                           <td className="p-4 text-slate-300">
-                            {
-                              player.height
-                            }
-                            ,{' '}
-                            {
-                              player.weight
-                            }{' '}
+                            {player.height},{' '}
+                            {player.weight}{' '}
                             lbs
                           </td>
 
@@ -1628,12 +1463,13 @@ cleaned[slot.id] = ids.filter(
                                 }}
                                 className="flex min-h-[1.5rem] cursor-pointer items-center text-xs italic text-slate-300 hover:text-white"
                               >
-                                {player.notes || (
-                                  <span className="not-italic text-slate-500">
-                                    + Add
-                                    notes...
-                                  </span>
-                                )}
+                                {player.notes ||
+                                  (
+                                    <span className="not-italic text-slate-500">
+                                      + Add
+                                      notes...
+                                    </span>
+                                  )}
                               </div>
                             )}
                           </td>
@@ -1651,13 +1487,11 @@ cleaned[slot.id] = ids.filter(
           </>
         )}
 
-        {/* COACHING STAFF */}
         {activeTab === 'coaching' && (
           <div className="space-y-6">
             <div className="glass-panel flex flex-col items-start justify-between gap-4 rounded-2xl p-4 sm:flex-row sm:items-center">
               <h2 className="text-lg font-semibold text-white">
-                Coaching & Support
-                Personnel
+                Coaching & Support Personnel
               </h2>
 
               <input
@@ -1682,29 +1516,21 @@ cleaned[slot.id] = ids.filter(
                   >
                     <div>
                       <h3 className="mb-1 text-lg font-bold text-white">
-                        {
-                          member.name
-                        }
+                        {member.name}
                       </h3>
 
                       <p className="text-sm font-medium text-blue-400">
-                        {
-                          member.title
-                        }
+                        {member.title}
                       </p>
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-700/50 pt-3 text-xs text-slate-500">
                       <span>
-                        Staff ID: #
-                        {
-                          member.id
-                        }
+                        Staff ID: #{member.id}
                       </span>
 
                       <span className="text-slate-400">
-                        Football
-                        Operations
+                        Football Operations
                       </span>
                     </div>
                   </div>
@@ -1714,12 +1540,10 @@ cleaned[slot.id] = ids.filter(
           </div>
         )}
 
-        {/* SCHEDULE */}
         {activeTab === 'schedule' && (
           <div className="glass-panel overflow-x-auto rounded-2xl p-6">
             <h2 className="mb-4 text-xl font-bold text-white">
-              2026 Season
-              Schedule
+              2026 Season Schedule
             </h2>
 
             <table className="w-full border-collapse text-left text-sm">
@@ -1771,15 +1595,11 @@ cleaned[slot.id] = ids.filter(
                       </td>
 
                       <td className="p-3 font-semibold text-white">
-                        {
-                          game.Opponent
-                        }
+                        {game.Opponent}
                       </td>
 
                       <td className="p-3 text-slate-300">
-                        {
-                          game.Location
-                        }
+                        {game.Location}
                       </td>
 
                       <td className="p-3 text-xs italic text-slate-400">
@@ -1794,188 +1614,8 @@ cleaned[slot.id] = ids.filter(
           </div>
         )}
 
-        {/* DEPTH CHART */}
-        {activeTab ===
-          'depth-chart' && (
-          <div className="space-y-6">
-            {/* DEPTH CHART HEADER */}
-            <div className="glass-panel rounded-2xl p-5">
-              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                <div>
-                  <h2 className="text-2xl font-bold text-white">
-                    Depth Chart
-                  </h2>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    Build the depth chart
-                    like a coaching staff.
-                    Drag players from the
-                    applicable player pool
-                    into each position.
-                  </p>
-                </div>
-
-                <button
-                  onClick={
-                    resetDepthChart
-                  }
-                  className="rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-2 text-xs font-semibold text-red-300 transition hover:bg-red-500/20"
-                >
-                  Reset Depth Chart
-                </button>
-              </div>
-            </div>
-
-            {/* DEPTH CHART SUB TABS */}
-            <div className="glass-panel rounded-2xl p-2">
-              <div className="grid grid-cols-3 gap-1">
-                <button
-                  onClick={() =>
-                    setDepthChartTab(
-                      'offense'
-                    )
-                  }
-                  className={`rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider transition ${
-                    depthChartTab ===
-                    'offense'
-                      ? 'bg-blue-500/20 text-blue-300 shadow-sm'
-                      : 'text-slate-500 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  Offense
-                </button>
-
-                <button
-                  onClick={() =>
-                    setDepthChartTab(
-                      'defense'
-                    )
-                  }
-                  className={`rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider transition ${
-                    depthChartTab ===
-                    'defense'
-                      ? 'bg-blue-500/20 text-blue-300 shadow-sm'
-                      : 'text-slate-500 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  Defense
-                </button>
-
-                <button
-                  onClick={() =>
-                    setDepthChartTab(
-                      'special-teams'
-                    )
-                  }
-                  className={`rounded-xl px-4 py-3 text-sm font-bold uppercase tracking-wider transition ${
-                    depthChartTab ===
-                    'special-teams'
-                      ? 'bg-blue-500/20 text-blue-300 shadow-sm'
-                      : 'text-slate-500 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  Special Teams
-                </button>
-              </div>
-            </div>
-
-            {/* CURRENT DEPTH CHART */}
-            <div>
-              <div className="mb-4 flex items-center gap-3">
-                <div className="h-px flex-1 bg-white/10" />
-
-                <h2 className="text-xs font-black uppercase tracking-[0.25em] text-blue-400">
-                  {
-                    getCurrentTabTitle()
-                  }
-                </h2>
-
-                <div className="h-px flex-1 bg-white/10" />
-              </div>
-
-              <div className="grid gap-5 xl:grid-cols-[240px_1fr]">
-                {/* PLAYER POOL */}
-                <div className="glass-panel rounded-2xl p-4">
-                  <div className="mb-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-white">
-                      Player Pool
-                    </h3>
-
-                    <p className="mt-1 text-[10px] leading-4 text-slate-600">
-                      Only unassigned
-                      players appear
-                      here.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {getDepthChartPlayers(
-                      depthChartTab
-                    ).map(
-                      (player) =>
-                        renderPlayerCard(
-                          player,
-                          null,
-                          true
-                        )
-                    )}
-
-                    {getDepthChartPlayers(
-                      depthChartTab
-                    ).length ===
-                      0 && (
-                      <div className="rounded-lg border border-dashed border-slate-700/70 p-5 text-center">
-                        <p className="text-xs font-semibold text-slate-500">
-                          All players
-                          assigned
-                        </p>
-
-                        <p className="mt-1 text-[9px] uppercase tracking-wider text-slate-700">
-                          Drag players
-                          between slots
-                          to adjust
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* POSITION SLOTS */}
-                <div
-                  className={`grid gap-3 ${
-                    getCurrentDepthSlots()
-                      .length <=
-                    3
-                      ? 'md:grid-cols-3'
-                      : getCurrentDepthSlots()
-                            .length <=
-                          5
-                        ? 'md:grid-cols-3 xl:grid-cols-5'
-                        : 'md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
-                  }`}
-                >
-                  {getCurrentDepthSlots().map(
-                    (slot) =>
-                      renderDepthSlot(
-                        slot
-                      )
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* INSTRUCTIONS */}
-            <div className="rounded-xl border border-white/5 bg-slate-950/40 p-4 text-center">
-              <p className="text-[10px] uppercase tracking-widest text-slate-600">
-                Drag a player into a
-                position • Drag players
-                up or down to change
-                their string • Changes
-                save automatically
-              </p>
-            </div>
-          </div>
-        )}
+        {activeTab === 'depth-chart' &&
+          renderDepthChart()}
       </main>
     </div>
   );
