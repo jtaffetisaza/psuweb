@@ -1245,16 +1245,12 @@ export default function RosterDashboard() {
                 </div>
 
                 <input
-                  type="text"
-                  placeholder="Search name or jersey #..."
-                  value={search}
-                  onChange={(event) =>
-                    setSearch(
-                      event.target.value
-                    )
-                  }
-                  className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
-                />
+  type="text"
+  placeholder="Search name or jersey #..."
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}
+  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-blue-950 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 md:w-64"
+/>
               </div>
             </div>
 
