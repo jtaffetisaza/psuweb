@@ -1301,7 +1301,7 @@ export default function RosterDashboard() {
             <p className="mt-1 text-sm leading-6 text-slate-400">
               Manage the editorial content for each
               matchup. Everything saved here is displayed
-              automatically on that opponent's matchup page.
+              automatically on that opponent matchup page.
             </p>
           </div>
 
