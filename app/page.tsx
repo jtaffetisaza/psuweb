@@ -504,7 +504,7 @@ export default function RosterDashboard() {
 
     try {
       const response = await fetch(
-        '/api/generate-matchup',
+        '/api/matchup-generate',
         {
           method: 'POST',
           headers: {
