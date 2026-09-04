@@ -1466,7 +1466,7 @@ export default function PlayerPage() {
       <main className="min-h-screen bg-slate-950 text-white p-8">
         <div className="max-w-6xl mx-auto">
           <Link
-            href="/roster"
+            href="/"
             className="text-blue-400 hover:text-blue-300"
           >
             ← Back to Roster
@@ -1528,7 +1528,7 @@ export default function PlayerPage() {
 
         {/* BACK */}
         <Link
-          href="/roster"
+          href="/"
           className="inline-flex items-center text-sm text-blue-400 hover:text-blue-300"
         >
           ← Back to Roster
