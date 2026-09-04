@@ -840,7 +840,7 @@ export default function RosterDashboard() {
 
           <div className="min-w-0 flex-1">
             <Link
-              href={`/players/${player.id}`}
+              href={`/player/${player.id}`}
               className="block truncate font-semibold text-white transition hover:text-blue-400 hover:underline"
             >
               {player.name}
@@ -1855,7 +1855,7 @@ export default function RosterDashboard() {
 
                           <td className="p-4 font-semibold text-white">
                             <Link
-                              href={`/players/${player.id}`}
+                              href={`/player/${player.id}`}
                               className="text-blue-400 transition hover:text-blue-300 hover:underline"
                             >
                               {player.name}
