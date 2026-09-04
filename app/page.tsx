@@ -23,6 +23,8 @@ interface Player {
   state_rank: number | null;
   recruiting_position: string | null;
   recruiting_team: string | null;
+  scouting_tag: string | null;
+  scouting_note: string | null;
 }
 
 interface StaffMember {
@@ -1835,7 +1837,7 @@ export default function RosterDashboard() {
                       </th>
 
                       <th className="w-72 p-4">
-                        Scouting Notes
+                        Scouting
                       </th>
                     </tr>
                   </thead>
@@ -1893,56 +1895,24 @@ export default function RosterDashboard() {
                           </td>
 
                           <td className="p-4">
-                            {editingNotesId ===
-                            player.id ? (
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  value={
-                                    tempNotes
-                                  }
-                                  onChange={(
-                                    event
-                                  ) =>
-                                    setTempNotes(
-                                      event
-                                        .target
-                                        .value
-                                    )
-                                  }
-                                  className="dark-field w-full px-2 py-1 text-xs"
-                                />
-
-                                <button
-                                  onClick={() =>
-                                    saveNotes(
-                                      player.id
-                                    )
-                                  }
-                                  className="blue-button px-3 py-1 text-xs"
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            ) : (
-                              <div
-                                onClick={() => {
-                                  setEditingNotesId(
-                                    player.id
-                                  );
-                                  setTempNotes(
-                                    player.notes ||
-                                      ''
-                                  );
-                                }}
-                                className="flex min-h-[1.5rem] cursor-pointer items-center text-xs italic text-slate-300 hover:text-white"
-                              >
-                                {player.notes || (
-                                  <span className="not-italic text-slate-500">
-                                    + Add notes...
+                            {player.scouting_tag ? (
+                              <div>
+                                <div className="mb-1">
+                                  <span className="rounded-md border border-blue-400/20 bg-blue-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                                    {player.scouting_tag}
                                   </span>
+                                </div>
+
+                                {player.scouting_note && (
+                                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                                    {player.scouting_note}
+                                  </p>
                                 )}
                               </div>
+                            ) : (
+                              <span className="text-xs text-slate-600">
+                                —
+                              </span>
                             )}
                           </td>
                         </tr>
