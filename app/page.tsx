@@ -41,6 +41,14 @@ interface Game {
   venue: string | null;
   note: string | null;
   is_home: boolean;
+  preview: string | null;
+  offense_breakdown: string | null;
+  defense_breakdown: string | null;
+  key_matchup: string | null;
+  key_storylines: string | null;
+  prediction: string | null;
+  conference: string | null;
+  game_type: string | null;
 }
 
 interface DepthSlot {
@@ -74,132 +82,36 @@ const POSITIONS = [
 ];
 
 const OFFENSE_SLOTS: DepthSlot[] = [
-  {
-    id: 'QB',
-    label: 'QB',
-    eligiblePositions: ['QB'],
-  },
-  {
-    id: 'RB',
-    label: 'RB',
-    eligiblePositions: ['RB'],
-  },
-  {
-    id: 'X',
-    label: 'X',
-    eligiblePositions: ['WR'],
-  },
-  {
-    id: 'Y',
-    label: 'Y',
-    eligiblePositions: ['WR'],
-  },
-  {
-    id: 'Z',
-    label: 'Z',
-    eligiblePositions: ['WR'],
-  },
-  {
-    id: 'TE',
-    label: 'TE',
-    eligiblePositions: ['TE'],
-  },
-  {
-    id: 'OT',
-    label: 'OT',
-    eligiblePositions: ['OL'],
-  },
-  {
-    id: 'G1',
-    label: 'G',
-    eligiblePositions: ['OL'],
-  },
-  {
-    id: 'C',
-    label: 'C',
-    eligiblePositions: ['OL'],
-  },
-  {
-    id: 'G2',
-    label: 'G',
-    eligiblePositions: ['OL'],
-  },
-  {
-    id: 'T',
-    label: 'T',
-    eligiblePositions: ['OL'],
-  },
+  { id: 'QB', label: 'QB', eligiblePositions: ['QB'] },
+  { id: 'RB', label: 'RB', eligiblePositions: ['RB'] },
+  { id: 'X', label: 'X', eligiblePositions: ['WR'] },
+  { id: 'Y', label: 'Y', eligiblePositions: ['WR'] },
+  { id: 'Z', label: 'Z', eligiblePositions: ['WR'] },
+  { id: 'TE', label: 'TE', eligiblePositions: ['TE'] },
+  { id: 'OT', label: 'OT', eligiblePositions: ['OL'] },
+  { id: 'G1', label: 'G', eligiblePositions: ['OL'] },
+  { id: 'C', label: 'C', eligiblePositions: ['OL'] },
+  { id: 'G2', label: 'G', eligiblePositions: ['OL'] },
+  { id: 'T', label: 'T', eligiblePositions: ['OL'] },
 ];
 
 const DEFENSE_SLOTS: DepthSlot[] = [
-  {
-    id: 'DE1',
-    label: 'DE',
-    eligiblePositions: ['DE', 'LB'],
-  },
-  {
-    id: 'DT1',
-    label: 'DT',
-    eligiblePositions: ['DT'],
-  },
-  {
-    id: 'DT2',
-    label: 'DT',
-    eligiblePositions: ['DT'],
-  },
-  {
-    id: 'DE2',
-    label: 'DE',
-    eligiblePositions: ['DE', 'LB'],
-  },
-  {
-    id: 'ILB',
-    label: 'ILB',
-    eligiblePositions: ['LB'],
-  },
-  {
-    id: 'OLB',
-    label: 'OLB',
-    eligiblePositions: ['LB'],
-  },
-  {
-    id: 'CB',
-    label: 'CB',
-    eligiblePositions: ['CB', 'S'],
-  },
-  {
-    id: 'NICKLE',
-    label: 'Nickle',
-    eligiblePositions: ['CB', 'S'],
-  },
-  {
-    id: 'SS',
-    label: 'SS',
-    eligiblePositions: ['S'],
-  },
-  {
-    id: 'FS',
-    label: 'FS',
-    eligiblePositions: ['S'],
-  },
+  { id: 'DE1', label: 'DE', eligiblePositions: ['DE', 'LB'] },
+  { id: 'DT1', label: 'DT', eligiblePositions: ['DT'] },
+  { id: 'DT2', label: 'DT', eligiblePositions: ['DT'] },
+  { id: 'DE2', label: 'DE', eligiblePositions: ['DE', 'LB'] },
+  { id: 'ILB', label: 'ILB', eligiblePositions: ['LB'] },
+  { id: 'OLB', label: 'OLB', eligiblePositions: ['LB'] },
+  { id: 'CB', label: 'CB', eligiblePositions: ['CB', 'S'] },
+  { id: 'NICKLE', label: 'Nickle', eligiblePositions: ['CB', 'S'] },
+  { id: 'SS', label: 'SS', eligiblePositions: ['S'] },
+  { id: 'FS', label: 'FS', eligiblePositions: ['S'] },
 ];
 
 const SPECIAL_TEAMS_SLOTS: DepthSlot[] = [
-  {
-    id: 'K',
-    label: 'K',
-    eligiblePositions: ['K'],
-  },
-  {
-    id: 'P',
-    label: 'P',
-    eligiblePositions: ['P'],
-  },
-  {
-    id: 'LS',
-    label: 'LS',
-    eligiblePositions: ['LS'],
-  },
+  { id: 'K', label: 'K', eligiblePositions: ['K'] },
+  { id: 'P', label: 'P', eligiblePositions: ['P'] },
+  { id: 'LS', label: 'LS', eligiblePositions: ['LS'] },
 ];
 
 const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
@@ -379,9 +291,22 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
   ],
 };
 
+type MatchupField =
+  | 'preview'
+  | 'offense_breakdown'
+  | 'defense_breakdown'
+  | 'key_matchup'
+  | 'key_storylines'
+  | 'prediction'
+  | 'note';
+
 export default function RosterDashboard() {
   const [activeTab, setActiveTab] = useState<
-    'roster' | 'coaching' | 'schedule' | 'depth-chart'
+    'roster' |
+    'coaching' |
+    'schedule' |
+    'depth-chart' |
+    'matchup-editor'
   >('roster');
 
   const [players, setPlayers] = useState<Player[]>([]);
@@ -408,6 +333,29 @@ export default function RosterDashboard() {
 
   const [depthChartTab, setDepthChartTab] =
     useState<DepthChartTab>('offense');
+
+  const [selectedMatchupId, setSelectedMatchupId] =
+    useState<number | null>(null);
+
+  const [matchupDraft, setMatchupDraft] =
+    useState<Record<MatchupField, string>>({
+      preview: '',
+      offense_breakdown: '',
+      defense_breakdown: '',
+      key_matchup: '',
+      key_storylines: '',
+      prediction: '',
+      note: '',
+    });
+
+  const [savingMatchup, setSavingMatchup] =
+    useState(false);
+
+  const [generatingMatchup, setGeneratingMatchup] =
+    useState(false);
+
+  const [matchupSaved, setMatchupSaved] =
+    useState(false);
 
   useEffect(() => {
     fetchPlayers();
@@ -511,16 +459,217 @@ export default function RosterDashboard() {
     }
   }
 
+  function loadMatchupEditor(
+    matchup: Game
+  ) {
+    setSelectedMatchupId(matchup.id);
+
+    setMatchupDraft({
+      preview: matchup.preview || '',
+      offense_breakdown:
+        matchup.offense_breakdown || '',
+      defense_breakdown:
+        matchup.defense_breakdown || '',
+      key_matchup:
+        matchup.key_matchup || '',
+      key_storylines:
+        matchup.key_storylines || '',
+      prediction:
+        matchup.prediction || '',
+      note: matchup.note || '',
+    });
+
+    setMatchupSaved(false);
+  }
+
+  function updateMatchupDraft(
+    field: MatchupField,
+    value: string
+  ) {
+    setMatchupDraft((current) => ({
+      ...current,
+      [field]: value,
+    }));
+
+    setMatchupSaved(false);
+  }
+
+  async function generateMatchupDraft() {
+    if (!selectedMatchupId) {
+      return;
+    }
+
+    setGeneratingMatchup(true);
+    setMatchupSaved(false);
+
+    try {
+      const response = await fetch(
+        '/api/generate-matchup',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            matchupId:
+              selectedMatchupId,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            'Failed to generate matchup draft'
+        );
+      }
+
+      setMatchupDraft(
+        (current) => ({
+          ...current,
+          preview:
+            data.generated
+              ?.preview || '',
+          offense_breakdown:
+            data.generated
+              ?.offense_breakdown ||
+            '',
+          defense_breakdown:
+            data.generated
+              ?.defense_breakdown ||
+            '',
+          key_matchup:
+            data.generated
+              ?.key_matchup || '',
+          key_storylines:
+            data.generated
+              ?.key_storylines ||
+            '',
+          prediction:
+            data.generated
+              ?.prediction || '',
+        })
+      );
+    } catch (error) {
+      console.error(
+        'AI matchup generation error:',
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate matchup draft'
+      );
+    } finally {
+      setGeneratingMatchup(
+        false
+      );
+    }
+  }
+
+  async function saveMatchupContent() {
+    if (!selectedMatchupId) {
+      return;
+    }
+
+    setSavingMatchup(true);
+    setMatchupSaved(false);
+
+    const { error } = await supabase
+      .from('matchups')
+      .update({
+        preview: matchupDraft.preview || null,
+        offense_breakdown:
+          matchupDraft.offense_breakdown || null,
+        defense_breakdown:
+          matchupDraft.defense_breakdown || null,
+        key_matchup:
+          matchupDraft.key_matchup || null,
+        key_storylines:
+          matchupDraft.key_storylines || null,
+        prediction:
+          matchupDraft.prediction || null,
+        note: matchupDraft.note || null,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq(
+        'id',
+        selectedMatchupId
+      );
+
+    setSavingMatchup(false);
+
+    if (error) {
+      console.error(
+        'Error saving matchup:',
+        error
+      );
+      return;
+    }
+
+    setSchedule((current) =>
+      current.map((game) =>
+        game.id === selectedMatchupId
+          ? {
+              ...game,
+              preview:
+                matchupDraft.preview ||
+                null,
+              offense_breakdown:
+                matchupDraft.offense_breakdown ||
+                null,
+              defense_breakdown:
+                matchupDraft.defense_breakdown ||
+                null,
+              key_matchup:
+                matchupDraft.key_matchup ||
+                null,
+              key_storylines:
+                matchupDraft.key_storylines ||
+                null,
+              prediction:
+                matchupDraft.prediction ||
+                null,
+              note:
+                matchupDraft.note ||
+                null,
+            }
+          : game
+      )
+    );
+
+    setMatchupSaved(true);
+  }
+
+  const selectedMatchup =
+    schedule.find(
+      (game) =>
+        game.id ===
+        selectedMatchupId
+    ) || null;
+
   const filteredPlayers = players
     .filter((player) => {
       const matchesPosition =
         selectedPosition === 'ALL' ||
-        player.position === selectedPosition;
+        player.position ===
+          selectedPosition;
 
       const matchesSearch =
         player.name
           .toLowerCase()
-          .includes(search.toLowerCase()) ||
+          .includes(
+            search.toLowerCase()
+          ) ||
         player.number
           .toString()
           .includes(search);
@@ -533,12 +682,16 @@ export default function RosterDashboard() {
     .sort((a, b) => {
       let comparison = 0;
 
-      if (sortBy === 'number') {
+      if (
+        sortBy === 'number'
+      ) {
         comparison =
           a.number - b.number;
       } else {
         comparison =
-          a.name.localeCompare(b.name);
+          a.name.localeCompare(
+            b.name
+          );
       }
 
       return sortOrder === 'asc'
@@ -546,15 +699,20 @@ export default function RosterDashboard() {
         : -comparison;
     });
 
-  const filteredStaff = staff.filter(
-    (member) =>
-      member.name
-        .toLowerCase()
-        .includes(search.toLowerCase()) ||
-      member.title
-        .toLowerCase()
-        .includes(search.toLowerCase())
-  );
+  const filteredStaff =
+    staff.filter(
+      (member) =>
+        member.name
+          .toLowerCase()
+          .includes(
+            search.toLowerCase()
+          ) ||
+        member.title
+          .toLowerCase()
+          .includes(
+            search.toLowerCase()
+          )
+    );
 
   function getSlotsForTab(
     tab: DepthChartTab
@@ -575,8 +733,14 @@ export default function RosterDashboard() {
   ) {
     return name
       .toLowerCase()
-      .replace(/[’‘`]/g, "'")
-      .replace(/\s+/g, ' ')
+      .replace(
+        /[’‘`]/g,
+        "'"
+      )
+      .replace(
+        /\s+/g,
+        ' '
+      )
       .trim();
   }
 
@@ -584,11 +748,15 @@ export default function RosterDashboard() {
     playerName: string
   ): Player | undefined {
     const normalizedTarget =
-      normalizePlayerName(playerName);
+      normalizePlayerName(
+        playerName
+      );
 
     return players.find(
       (player) =>
-        normalizePlayerName(player.name) ===
+        normalizePlayerName(
+          player.name
+        ) ===
         normalizedTarget
     );
   }
@@ -596,9 +764,12 @@ export default function RosterDashboard() {
   function getDepthChartPlayers(
     tab: DepthChartTab
   ) {
-    let positionPool: string[] = [];
+    let positionPool: string[] =
+      [];
 
-    if (tab === 'offense') {
+    if (
+      tab === 'offense'
+    ) {
       positionPool = [
         'QB',
         'RB',
@@ -606,7 +777,9 @@ export default function RosterDashboard() {
         'TE',
         'OL',
       ];
-    } else if (tab === 'defense') {
+    } else if (
+      tab === 'defense'
+    ) {
       positionPool = [
         'DE',
         'DT',
@@ -628,7 +801,9 @@ export default function RosterDashboard() {
           STATIC_DEPTH_ASSIGNMENTS
         )
           .flat()
-          .map(normalizePlayerName)
+          .map(
+            normalizePlayerName
+          )
       );
 
     return players.filter(
@@ -648,9 +823,10 @@ export default function RosterDashboard() {
     player: Player,
     compact = false
   ) {
-    const cardPadding = compact
-      ? 'p-3'
-      : 'p-4';
+    const cardPadding =
+      compact
+        ? 'p-3'
+        : 'p-4';
 
     return (
       <div
@@ -664,7 +840,7 @@ export default function RosterDashboard() {
 
           <div className="min-w-0 flex-1">
             <Link
-              href={`/player/${player.id}`}
+              href={`/players/${player.id}`}
               className="block truncate font-semibold text-white transition hover:text-blue-400 hover:underline"
             >
               {player.name}
@@ -714,7 +890,8 @@ export default function RosterDashboard() {
         </div>
 
         <div className="space-y-2">
-          {assignedPlayers.length === 0 ? (
+          {assignedPlayers.length ===
+          0 ? (
             <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-5 text-center text-xs text-slate-600">
               No player assigned
             </div>
@@ -749,7 +926,9 @@ export default function RosterDashboard() {
                 let stringLabel =
                   `${index + 1}th String`;
 
-                if (index === 0) {
+                if (
+                  index === 0
+                ) {
                   stringLabel =
                     '1st String';
                 } else if (
@@ -892,9 +1071,12 @@ export default function RosterDashboard() {
   function renderPositionEditor(
     position: string
   ) {
-    let relevantSlots: DepthSlot[] = [];
+    let relevantSlots: DepthSlot[] =
+      [];
 
-    if (position === 'QB') {
+    if (
+      position === 'QB'
+    ) {
       relevantSlots =
         OFFENSE_SLOTS.filter(
           (slot) =>
@@ -1107,6 +1289,326 @@ export default function RosterDashboard() {
     );
   }
 
+  function renderMatchupEditor() {
+    return (
+      <div className="space-y-6">
+        <div className="glass-panel rounded-2xl p-5">
+          <div>
+            <h2 className="text-xl font-bold text-white">
+              Matchup Editor
+            </h2>
+
+            <p className="mt-1 text-sm leading-6 text-slate-400">
+              Manage the editorial content for each
+              matchup. Everything saved here is displayed
+              automatically on that opponent's matchup page.
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Select matchup
+            </label>
+
+            <select
+              value={
+                selectedMatchupId ?? ''
+              }
+              onChange={(event) => {
+                const id =
+                  Number(
+                    event.target.value
+                  );
+
+                const matchup =
+                  schedule.find(
+                    (game) =>
+                      game.id === id
+                  );
+
+                if (matchup) {
+                  loadMatchupEditor(
+                    matchup
+                  );
+                }
+              }}
+              className="dark-field w-full px-4 py-3 text-sm"
+            >
+              <option value="">
+                Select a 2026 matchup...
+              </option>
+
+              {schedule.map(
+                (game) => (
+                  <option
+                    key={game.id}
+                    value={game.id}
+                  >
+                    {game.date} — Penn State vs.{' '}
+                    {game.opponent}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+        </div>
+
+        {!selectedMatchup ? (
+          <div className="glass-panel rounded-2xl p-10 text-center">
+            <div className="text-sm font-semibold text-slate-300">
+              Select a matchup to begin
+            </div>
+
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+              Choose an opponent above to edit its preview,
+              key matchups, storylines, prediction, and
+              other editorial content.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="glass-panel rounded-2xl p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Selected matchup
+                  </div>
+
+                  <h2 className="mt-1 text-2xl font-bold text-white">
+                    Penn State vs.{' '}
+                    {selectedMatchup.opponent}
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-400">
+                    {selectedMatchup.date}
+                    {selectedMatchup.time
+                      ? ` • ${selectedMatchup.time.slice(0, 5)}`
+                      : ''}
+                    {selectedMatchup.location
+                      ? ` • ${selectedMatchup.location}`
+                      : ''}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={
+                      generateMatchupDraft
+                    }
+                    disabled={
+                      generatingMatchup ||
+                      savingMatchup
+                    }
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {generatingMatchup
+                      ? 'Generating...'
+                      : 'Generate AI Draft'}
+                  </button>
+
+                  <Link
+                    href={`/matchup/${selectedMatchup.id}`}
+                    target="_blank"
+                    className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
+                  >
+                    View Matchup Page
+                  </Link>
+                </div>
+              </div>
+
+              {generatingMatchup && (
+                <div className="mt-4 rounded-xl border border-blue-400/20 bg-blue-500/5 px-4 py-3 text-sm text-blue-300">
+                  Generating a matchup preview. Your existing
+                  content will not be saved or overwritten until
+                  you click Save Matchup Content.
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <div className="glass-panel rounded-2xl p-5 xl:col-span-2">
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Matchup Preview
+                </label>
+
+                <textarea
+                  value={
+                    matchupDraft.preview
+                  }
+                  onChange={(event) =>
+                    updateMatchupDraft(
+                      'preview',
+                      event.target.value
+                    )
+                  }
+                  rows={8}
+                  placeholder="Write the overall matchup preview..."
+                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
+                />
+              </div>
+
+              <div className="glass-panel rounded-2xl p-5">
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Offense Breakdown
+                </label>
+
+                <textarea
+                  value={
+                    matchupDraft.offense_breakdown
+                  }
+                  onChange={(event) =>
+                    updateMatchupDraft(
+                      'offense_breakdown',
+                      event.target.value
+                    )
+                  }
+                  rows={8}
+                  placeholder="How Penn State should attack offensively..."
+                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
+                />
+              </div>
+
+              <div className="glass-panel rounded-2xl p-5">
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Defense Breakdown
+                </label>
+
+                <textarea
+                  value={
+                    matchupDraft.defense_breakdown
+                  }
+                  onChange={(event) =>
+                    updateMatchupDraft(
+                      'defense_breakdown',
+                      event.target.value
+                    )
+                  }
+                  rows={8}
+                  placeholder="How Penn State should defend the opponent..."
+                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
+                />
+              </div>
+
+              <div className="glass-panel rounded-2xl p-5">
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Key Matchup
+                </label>
+
+                <textarea
+                  value={
+                    matchupDraft.key_matchup
+                  }
+                  onChange={(event) =>
+                    updateMatchupDraft(
+                      'key_matchup',
+                      event.target.value
+                    )
+                  }
+                  rows={6}
+                  placeholder="Example: Penn State pass rush vs. opponent QB..."
+                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
+                />
+              </div>
+
+              <div className="glass-panel rounded-2xl p-5">
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Key Storylines
+                </label>
+
+                <textarea
+                  value={
+                    matchupDraft.key_storylines
+                  }
+                  onChange={(event) =>
+                    updateMatchupDraft(
+                      'key_storylines',
+                      event.target.value
+                    )
+                  }
+                  rows={6}
+                  placeholder="Enter one storyline per line..."
+                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
+                />
+              </div>
+
+              <div className="glass-panel rounded-2xl p-5">
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Prediction / Outlook
+                </label>
+
+                <textarea
+                  value={
+                    matchupDraft.prediction
+                  }
+                  onChange={(event) =>
+                    updateMatchupDraft(
+                      'prediction',
+                      event.target.value
+                    )
+                  }
+                  rows={7}
+                  placeholder="Write the expected game outlook and prediction..."
+                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
+                />
+              </div>
+
+              <div className="glass-panel rounded-2xl p-5">
+                <label className="mb-2 block text-sm font-semibold text-white">
+                  Internal / Display Note
+                </label>
+
+                <textarea
+                  value={
+                    matchupDraft.note
+                  }
+                  onChange={(event) =>
+                    updateMatchupDraft(
+                      'note',
+                      event.target.value
+                    )
+                  }
+                  rows={7}
+                  placeholder="Optional matchup note..."
+                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
+                />
+              </div>
+            </div>
+
+            <div className="glass-panel flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                {matchupSaved ? (
+                  <div className="text-sm font-semibold text-emerald-400">
+                    Matchup content saved.
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500">
+                    Changes are saved directly to the matchup.
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={
+                  saveMatchupContent
+                }
+                disabled={
+                  savingMatchup ||
+                  generatingMatchup
+                }
+                className="blue-button px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingMatchup
+                  ? 'Saving...'
+                  : 'Save Matchup Content'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
       <header className="mx-auto mb-8 max-w-7xl">
@@ -1116,14 +1618,14 @@ export default function RosterDashboard() {
 
         <p className="max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
           Manage player roster, scouting notes,
-          coaching personnel, schedule, and depth
-          chart.
+          coaching personnel, schedule, depth chart,
+          and matchup editorial content.
         </p>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6">
         {/* MAIN NAVIGATION */}
-        <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur sm:w-fit">
+        <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur">
           <button
             onClick={() =>
               setActiveTab('roster')
@@ -1174,6 +1676,19 @@ export default function RosterDashboard() {
             }`}
           >
             Depth Chart
+          </button>
+
+          <button
+            onClick={() =>
+              setActiveTab('matchup-editor')
+            }
+            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
+              activeTab === 'matchup-editor'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Matchup Editor
           </button>
         </div>
 
@@ -1340,7 +1855,7 @@ export default function RosterDashboard() {
 
                           <td className="p-4 font-semibold text-white">
                             <Link
-                              href={`/player/${player.id}`}
+                              href={`/players/${player.id}`}
                               className="text-blue-400 transition hover:text-blue-300 hover:underline"
                             >
                               {player.name}
@@ -1504,14 +2019,28 @@ export default function RosterDashboard() {
         {/* SCHEDULE */}
         {activeTab === 'schedule' && (
           <div className="glass-panel overflow-x-auto rounded-2xl p-6">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-white">
-                2026 Season Schedule
-              </h2>
+            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-white">
+                  2026 Season Schedule
+                </h2>
 
-              <p className="mt-1 text-sm text-slate-400">
-                Select a matchup to view the full game breakdown.
-              </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Select any game to view the full matchup
+                  breakdown.
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setActiveTab(
+                    'matchup-editor'
+                  )
+                }
+                className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-300 transition hover:bg-blue-500/20"
+              >
+                Edit Matchups
+              </button>
             </div>
 
             <table className="w-full border-collapse text-left text-sm">
@@ -1543,39 +2072,61 @@ export default function RosterDashboard() {
                 {schedule.map(
                   (game) => (
                     <tr
-                      key={game.id}
-                      className="transition hover:bg-blue-500/[0.04]"
+                      key={
+                        game.id
+                      }
+                      className="group transition hover:bg-blue-500/[0.06]"
                     >
-                      <td className="p-3 font-mono font-bold text-blue-400">
-                        {game.date}
-                      </td>
-
-                      <td className="p-3 text-slate-300">
-                        {game.time
-                          ? game.time.slice(
-                              0,
-                              5
-                            )
-                          : 'TBD'}
-                      </td>
-
-                      <td className="p-3 font-semibold">
+                      <td className="p-0">
                         <Link
                           href={`/matchup/${game.id}`}
-                          className="text-blue-400 transition hover:text-blue-300 hover:underline"
+                          className="block p-3 font-mono font-bold text-blue-400"
+                        >
+                          {game.date}
+                        </Link>
+                      </td>
+
+                      <td className="p-0">
+                        <Link
+                          href={`/matchup/${game.id}`}
+                          className="block p-3 text-slate-300"
+                        >
+                          {game.time
+                            ? game.time.slice(
+                                0,
+                                5
+                              )
+                            : 'TBD'}
+                        </Link>
+                      </td>
+
+                      <td className="p-0">
+                        <Link
+                          href={`/matchup/${game.id}`}
+                          className="block p-3 font-semibold text-blue-400 transition group-hover:text-blue-300 group-hover:underline"
                         >
                           {game.opponent}
                         </Link>
                       </td>
 
-                      <td className="p-3 text-slate-300">
-                        {game.location ||
-                          'TBD'}
+                      <td className="p-0">
+                        <Link
+                          href={`/matchup/${game.id}`}
+                          className="block p-3 text-slate-300"
+                        >
+                          {game.location ||
+                            'TBD'}
+                        </Link>
                       </td>
 
-                      <td className="p-3 text-xs italic text-slate-400">
-                        {game.note ||
-                          '—'}
+                      <td className="p-0">
+                        <Link
+                          href={`/matchup/${game.id}`}
+                          className="block p-3 text-xs italic text-slate-400"
+                        >
+                          {game.note ||
+                            '—'}
+                        </Link>
                       </td>
                     </tr>
                   )
@@ -1594,6 +2145,10 @@ export default function RosterDashboard() {
         {/* DEPTH CHART */}
         {activeTab === 'depth-chart' &&
           renderDepthChart()}
+
+        {/* MATCHUP EDITOR */}
+        {activeTab === 'matchup-editor' &&
+          renderMatchupEditor()}
       </main>
     </div>
   );

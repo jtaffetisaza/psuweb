@@ -468,202 +468,214 @@ export default async function MatchupPage({
 
         </section>
 
-        {/* TEAM COMPARISON */}
-        <section className="glass-panel overflow-hidden rounded-2xl">
+                {/* TEAM COMPARISON */}
+                <section className="glass-panel overflow-hidden rounded-2xl">
 
-          <div className="border-b border-white/10 p-6">
+<div className="border-b border-white/10 p-6">
 
-            <div className="text-xs font-bold uppercase tracking-wider text-blue-400">
-              Team Comparison
-            </div>
+  <div className="text-xs font-bold uppercase tracking-wider text-blue-400">
+    Team Comparison
+  </div>
 
-            <h2 className="mt-1 text-2xl font-bold text-white">
-              By the Numbers
-            </h2>
+  <h2 className="mt-1 text-2xl font-bold text-white">
+    By the Numbers
+  </h2>
 
-          </div>
+</div>
 
-          <div className="overflow-x-auto">
+{pennStateStats || opponentStats ? (
+  <div className="overflow-x-auto">
 
-            <table className="w-full min-w-[600px] border-collapse">
+    <table className="w-full min-w-[600px] border-collapse">
 
-              <thead>
+      <thead>
+        <tr className="border-b border-white/10 bg-slate-950/40">
 
-                <tr className="border-b border-white/10 bg-slate-950/40">
+          <th className="p-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Category
+          </th>
 
-                  <th className="p-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Category
-                  </th>
+          <th className="p-4 text-center text-xs font-semibold uppercase tracking-wider text-blue-400">
+            Penn State
+          </th>
 
-                  <th className="p-4 text-center text-xs font-semibold uppercase tracking-wider text-blue-400">
-                    Penn State
-                  </th>
+          <th className="p-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+            {game.opponent}
+          </th>
 
-                  <th className="p-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    {game.opponent}
-                  </th>
+        </tr>
+      </thead>
 
-                </tr>
+      <tbody className="divide-y divide-white/5">
 
-              </thead>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm font-medium text-slate-300">
+            Record
+          </td>
 
-              <tbody className="divide-y divide-white/5">
+          <td className="p-4 text-center font-bold text-white">
+            {game.penn_state_record || '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm font-medium text-slate-300">
-                    Record
-                  </td>
+          <td className="p-4 text-center font-bold text-white">
+            {game.opponent_record || '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-bold text-white">
-                    {game.penn_state_record || '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Points / Game
+          </td>
 
-                  <td className="p-4 text-center font-bold text-white">
-                    {game.opponent_record || '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.points_per_game ?? '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Points / Game
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.points_per_game ?? '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.points_per_game ?? '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Total Yards / Game
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.points_per_game ?? '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.total_yards_per_game ?? '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Total Yards / Game
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.total_yards_per_game ?? '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.total_yards_per_game ?? '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Passing Yards / Game
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.total_yards_per_game ?? '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.passing_yards_per_game ?? '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Passing Yards / Game
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.passing_yards_per_game ?? '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.passing_yards_per_game ?? '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Rushing Yards / Game
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.passing_yards_per_game ?? '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.rushing_yards_per_game ?? '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Rushing Yards / Game
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.rushing_yards_per_game ?? '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.rushing_yards_per_game ?? '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Points Allowed / Game
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.rushing_yards_per_game ?? '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.points_allowed_per_game ?? '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Points Allowed / Game
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.points_allowed_per_game ?? '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.points_allowed_per_game ?? '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Turnovers
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.points_allowed_per_game ?? '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.turnovers ?? '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Turnovers
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.turnovers ?? '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.turnovers ?? '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Sacks
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.turnovers ?? '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.sacks ?? '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Sacks
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.sacks ?? '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.sacks ?? '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            3rd Down %
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.sacks ?? '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.third_down_pct != null
+              ? `${pennStateStats.third_down_pct}%`
+              : '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    3rd Down %
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.third_down_pct != null
+              ? `${opponentStats.third_down_pct}%`
+              : '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.third_down_pct != null
-                      ? `${pennStateStats.third_down_pct}%`
-                      : '—'}
-                  </td>
+        <tr className="hover:bg-white/[0.02]">
+          <td className="p-4 text-sm text-slate-400">
+            Red Zone %
+          </td>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.third_down_pct != null
-                      ? `${opponentStats.third_down_pct}%`
-                      : '—'}
-                  </td>
-                </tr>
+          <td className="p-4 text-center font-semibold text-white">
+            {pennStateStats?.red_zone_pct != null
+              ? `${pennStateStats.red_zone_pct}%`
+              : '—'}
+          </td>
 
-                <tr className="hover:bg-white/[0.02]">
-                  <td className="p-4 text-sm text-slate-400">
-                    Red Zone %
-                  </td>
+          <td className="p-4 text-center font-semibold text-white">
+            {opponentStats?.red_zone_pct != null
+              ? `${opponentStats.red_zone_pct}%`
+              : '—'}
+          </td>
+        </tr>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {pennStateStats?.red_zone_pct != null
-                      ? `${pennStateStats.red_zone_pct}%`
-                      : '—'}
-                  </td>
+      </tbody>
 
-                  <td className="p-4 text-center font-semibold text-white">
-                    {opponentStats?.red_zone_pct != null
-                      ? `${opponentStats.red_zone_pct}%`
-                      : '—'}
-                  </td>
-                </tr>
+    </table>
 
-              </tbody>
+  </div>
+) : (
+  <div className="p-8 text-center">
 
-            </table>
+    <div className="text-sm font-semibold text-slate-300">
+      No season statistics yet
+    </div>
 
-          </div>
+    <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+      Team statistics will appear here automatically after Penn State plays its first game of the season.
+    </p>
 
-        </section>
+  </div>
+)}
+
+</section>
 
         {/* MATCHUP HISTORY */}
         <section className="glass-panel overflow-hidden rounded-2xl">
