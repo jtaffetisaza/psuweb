@@ -39,7 +39,7 @@ interface SeasonStats {
   season: number;
   team: string;
   position: string;
-  games: number;
+  games: number | null;
   stats: Record<string, Record<string, number | string>>;
 }
 
@@ -50,12 +50,14 @@ interface StatDefinition {
   type?: 'number' | 'decimal' | 'percentage';
 }
 
+const CURRENT_SEASON = 2026;
+
 const STAT_DEFINITIONS: Record<string, StatDefinition[]> = {
   QB: [
     { category: 'passing', key: 'YDS', label: 'Passing Yards' },
     { category: 'passing', key: 'TD', label: 'Passing TDs' },
     { category: 'passing', key: 'INT', label: 'INTs' },
-    { category: 'passing', key: 'CMP', label: 'Completions' },
+    { category: 'passing', key: 'COMPLETIONS', label: 'Completions' },
     { category: 'rushing', key: 'YDS', label: 'Rushing Yards' },
     { category: 'rushing', key: 'TD', label: 'Rushing TDs' },
   ],
@@ -152,20 +154,6 @@ function getStat(
   const number = Number(value);
 
   return Number.isNaN(number) ? 0 : number;
-}
-
-function getStatWithFallback(
-  stats: Record<string, Record<string, number | string>>,
-  category: string,
-  keys: string[]
-): number {
-  for (const key of keys) {
-    const value = getStat(stats, category, key);
-
-    if (value !== 0) return value;
-  }
-
-  return 0;
 }
 
 function formatNumber(value: number): string {
@@ -297,10 +285,31 @@ export default function PlayerProfilePage() {
 
   const statDefinitions = STAT_DEFINITIONS[positionKey] || [];
 
+  const currentSeason = useMemo(
+    () =>
+      seasonStats.find(
+        (season) =>
+          season.season === CURRENT_SEASON &&
+          season.team.toLowerCase() === 'penn state'
+      ) || null,
+    [seasonStats]
+  );
+
+  const previousSeasons = useMemo(
+    () =>
+      seasonStats.filter(
+        (season) =>
+          season.season !== CURRENT_SEASON &&
+          season.team.toLowerCase() === 'penn state'
+      ),
+    [seasonStats]
+  );
+
   const pennStateSeasons = useMemo(
     () =>
       seasonStats.filter(
-        (season) => season.team.toLowerCase() === 'penn state'
+        (season) =>
+          season.team.toLowerCase() === 'penn state'
       ),
     [seasonStats]
   );
@@ -344,6 +353,27 @@ export default function PlayerProfilePage() {
     () => sortSeasonsDescending(seasonStats),
     [seasonStats]
   );
+
+  const careerStatValues = statDefinitions.map((definition) => ({
+    ...definition,
+    value: calculateStat(seasonStats, definition),
+  }));
+
+  const pennStateStatValues = statDefinitions.map((definition) => ({
+    ...definition,
+    value: calculateStat(pennStateSeasons, definition),
+  }));
+
+  const currentSeasonStatValues = currentSeason
+    ? statDefinitions.map((definition) => ({
+        ...definition,
+        value: getStat(
+          currentSeason.stats,
+          definition.category,
+          definition.key
+        ),
+      }))
+    : [];
 
   const hasRecruitingInfo =
     player?.star_rating != null ||
@@ -392,21 +422,6 @@ export default function PlayerProfilePage() {
     player.jersey_number ??
     player.jersey ??
     null;
-
-  const careerStatValues = statDefinitions.map((definition) => ({
-    ...definition,
-    value: calculateStat(seasonStats, definition),
-  }));
-
-  const pennStateStatValues = statDefinitions.map((definition) => ({
-    ...definition,
-    value: calculateStat(pennStateSeasons, definition),
-  }));
-
-  const previousStatValues = statDefinitions.map((definition) => ({
-    ...definition,
-    value: calculateStat(previousSchoolSeasons, definition),
-  }));
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-6">
@@ -550,6 +565,96 @@ export default function PlayerProfilePage() {
               {teams.length || '—'}
             </p>
           </div>
+        </section>
+
+        {/* 2026 Season */}
+        <section className="glass-panel mt-6 rounded-2xl p-6 sm:p-7">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-xl font-bold text-white">
+                  {CURRENT_SEASON} Season
+                </h2>
+
+                <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-bold uppercase tracking-wider text-blue-400">
+                  Current
+                </span>
+              </div>
+
+              <p className="mt-1 text-xs text-slate-500">
+                Penn State statistics for the current season
+              </p>
+            </div>
+
+            {currentSeason?.games != null && currentSeason.games > 0 && (
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium text-slate-300">
+                {currentSeason.games}{' '}
+                {currentSeason.games === 1 ? 'game' : 'games'}
+              </span>
+            )}
+          </div>
+
+          {!currentSeason ? (
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+              <p className="font-semibold text-white">
+                No {CURRENT_SEASON} statistics yet.
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Season statistics will appear here automatically after
+                Penn State games are played and the stats are synced.
+              </p>
+            </div>
+          ) : statDefinitions.length === 0 ? (
+            <p className="text-sm italic text-slate-400">
+              Statistics are not currently available for this position.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                {currentSeasonStatValues.map((stat) => (
+                  <div
+                    key={`current-${stat.category}-${stat.key}`}
+                    className="rounded-xl border border-blue-500/10 bg-blue-500/[0.04] p-4"
+                  >
+                    <p className="text-xs text-slate-400">
+                      {stat.label}
+                    </p>
+
+                    <p className="mt-2 text-2xl font-bold text-white">
+                      {formatStatValue(stat.value, stat.type)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {currentSeason.games != null && currentSeason.games > 0 && (
+                <div className="mt-6 border-t border-slate-800 pt-5">
+                  <p className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Per Game
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                    {currentSeasonStatValues
+                      .filter((stat) => stat.value !== 0)
+                      .map((stat) => (
+                        <div
+                          key={`current-${stat.category}-${stat.key}-pg`}
+                        >
+                          <p className="text-xs text-slate-500">
+                            {stat.label}
+                          </p>
+
+                          <p className="mt-1 font-semibold text-slate-200">
+                            {(stat.value / currentSeason.games!).toFixed(1)}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </section>
 
         {/* Career Statistics */}
@@ -796,13 +901,18 @@ export default function PlayerProfilePage() {
                           );
 
                           return (
-                            <div key={`${definition.category}-${definition.key}`}>
+                            <div
+                              key={`${definition.category}-${definition.key}`}
+                            >
                               <p className="text-xs text-slate-500">
                                 {definition.label}
                               </p>
 
                               <p className="mt-1 font-semibold text-white">
-                                {formatStatValue(value, definition.type)}
+                                {formatStatValue(
+                                  value,
+                                  definition.type
+                                )}
                               </p>
                             </div>
                           );
@@ -840,7 +950,10 @@ export default function PlayerProfilePage() {
                     <span className="text-2xl tracking-tight">
                       <span className="text-yellow-400">
                         {'★'.repeat(
-                          Math.min(Math.max(player.star_rating, 0), 5)
+                          Math.min(
+                            Math.max(player.star_rating, 0),
+                            5
+                          )
                         )}
                       </span>
 

@@ -32,12 +32,15 @@ interface StaffMember {
 }
 
 interface Game {
-  id?: number;
-  Date: string;
-  Time: string | null;
-  Opponent: string;
-  Location: string;
-  Note: string | null;
+  id: number;
+  season: number;
+  opponent: string;
+  date: string;
+  time: string | null;
+  location: string | null;
+  venue: string | null;
+  note: string | null;
+  is_home: boolean;
 }
 
 interface DepthSlot {
@@ -449,13 +452,14 @@ export default function RosterDashboard() {
 
   async function fetchSchedule() {
     const { data, error } = await supabase
-      .from('Schedule')
+      .from('matchups')
       .select('*')
-      .order('Date', { ascending: true });
+      .eq('season', 2026)
+      .order('date', { ascending: true });
 
     if (error) {
       console.error(
-        'Error fetching schedule:',
+        'Error fetching matchups:',
         error
       );
       return;
@@ -1118,6 +1122,7 @@ export default function RosterDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6">
+        {/* MAIN NAVIGATION */}
         <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur sm:w-fit">
           <button
             onClick={() =>
@@ -1172,6 +1177,7 @@ export default function RosterDashboard() {
           </button>
         </div>
 
+        {/* ROSTER */}
         {activeTab === 'roster' && (
           <>
             <div className="glass-panel flex flex-col items-center justify-between gap-4 rounded-2xl p-4 md:flex-row">
@@ -1245,12 +1251,16 @@ export default function RosterDashboard() {
                 </div>
 
                 <input
-  type="text"
-  placeholder="Search name or jersey #..."
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-blue-950 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 md:w-64"
-/>
+                  type="text"
+                  placeholder="Search name or jersey #..."
+                  value={search}
+                  onChange={(e) =>
+                    setSearch(
+                      e.target.value
+                    )
+                  }
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-blue-950 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 md:w-64"
+                />
               </div>
             </div>
 
@@ -1434,6 +1444,7 @@ export default function RosterDashboard() {
           </>
         )}
 
+        {/* COACHING STAFF */}
         {activeTab === 'coaching' && (
           <div className="space-y-6">
             <div className="glass-panel flex flex-col items-start justify-between gap-4 rounded-2xl p-4 sm:flex-row sm:items-center">
@@ -1490,11 +1501,18 @@ export default function RosterDashboard() {
           </div>
         )}
 
+        {/* SCHEDULE */}
         {activeTab === 'schedule' && (
           <div className="glass-panel overflow-x-auto rounded-2xl p-6">
-            <h2 className="mb-4 text-xl font-bold text-white">
-              2026 Season Schedule
-            </h2>
+            <div className="mb-5">
+              <h2 className="text-xl font-bold text-white">
+                2026 Season Schedule
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-400">
+                Select a matchup to view the full game breakdown.
+              </p>
+            </div>
 
             <table className="w-full border-collapse text-left text-sm">
               <thead>
@@ -1523,24 +1541,18 @@ export default function RosterDashboard() {
 
               <tbody className="divide-y divide-slate-700/50">
                 {schedule.map(
-                  (
-                    game,
-                    index
-                  ) => (
+                  (game) => (
                     <tr
-                      key={
-                        game.id ||
-                        index
-                      }
+                      key={game.id}
                       className="transition hover:bg-blue-500/[0.04]"
                     >
                       <td className="p-3 font-mono font-bold text-blue-400">
-                        {game.Date}
+                        {game.date}
                       </td>
 
                       <td className="p-3 text-slate-300">
-                        {game.Time
-                          ? game.Time.slice(
+                        {game.time
+                          ? game.time.slice(
                               0,
                               5
                             )
@@ -1548,30 +1560,21 @@ export default function RosterDashboard() {
                       </td>
 
                       <td className="p-3 font-semibold">
-                        {game.id ? (
-                          <Link
-                            href={`/matchup/${game.id}`}
-                            className="text-blue-400 transition hover:text-blue-300 hover:underline"
-                          >
-                            {
-                              game.Opponent
-                            }
-                          </Link>
-                        ) : (
-                          <span className="text-white">
-                            {
-                              game.Opponent
-                            }
-                          </span>
-                        )}
+                        <Link
+                          href={`/matchup/${game.id}`}
+                          className="text-blue-400 transition hover:text-blue-300 hover:underline"
+                        >
+                          {game.opponent}
+                        </Link>
                       </td>
 
                       <td className="p-3 text-slate-300">
-                        {game.Location}
+                        {game.location ||
+                          'TBD'}
                       </td>
 
                       <td className="p-3 text-xs italic text-slate-400">
-                        {game.Note ||
+                        {game.note ||
                           '—'}
                       </td>
                     </tr>
@@ -1579,9 +1582,16 @@ export default function RosterDashboard() {
                 )}
               </tbody>
             </table>
+
+            {schedule.length === 0 && (
+              <div className="py-10 text-center text-sm text-slate-500">
+                No games found for the 2026 season.
+              </div>
+            )}
           </div>
         )}
 
+        {/* DEPTH CHART */}
         {activeTab === 'depth-chart' &&
           renderDepthChart()}
       </main>
