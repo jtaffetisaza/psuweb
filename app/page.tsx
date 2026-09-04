@@ -17,7 +17,6 @@ interface Player {
   previous_school: string;
   notes: string;
 
-  // Recruiting
   star_rating: number | null;
   recruiting_class: number | null;
   national_rank: number | null;
@@ -53,7 +52,7 @@ type DepthChartTab =
   | 'defense'
   | 'special-teams';
 
-type DepthAssignments = Record<string, number[]>;
+type DepthAssignments = Record<string, string[]>;
 
 const POSITIONS = [
   'ALL',
@@ -201,11 +200,194 @@ const SPECIAL_TEAMS_SLOTS: DepthSlot[] = [
   },
 ];
 
-const ALL_DEPTH_SLOTS = [
-  ...OFFENSE_SLOTS,
-  ...DEFENSE_SLOTS,
-  ...SPECIAL_TEAMS_SLOTS,
-];
+/*
+|--------------------------------------------------------------------------
+| 2026 PENN STATE DEPTH CHART
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| These assignments use PLAYER NAMES, not database IDs or jersey numbers.
+| This prevents duplicate jersey numbers from causing incorrect players
+| to appear in the depth chart.
+|
+*/
+
+const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
+  QB: [
+    'Rocco Becht',
+    'Alex Manske',
+    'Connor Barry',
+    'Kase Evans',
+    'Jack Lambert',
+  ],
+
+  RB: [
+    'Carson Hansen',
+    'James Peoples',
+    'Quinton Martin Jr.',
+    'Cam Wallace',
+    "D'Antae Sheffey",
+  ],
+
+  X: [
+    'Chase Sowell',
+    'Zay Robinson',
+    'Keith Jones Jr.',
+    'Ben Whitver',
+  ],
+
+  Y: [
+    'Brett Eskildsen',
+    'Karon Brookins',
+    'Peter Gonzalez',
+    'Ethan Black',
+  ],
+
+  Z: [
+    'Koby Howard',
+    'Amarion Jackson',
+    'Lyrick Samuel',
+    'Logan Cunningham',
+  ],
+
+  TE: [
+    'Benjamin Brahmer',
+    'Andrew Rappleyea',
+    'Gabe Burkle',
+    'Peyton Falzone',
+    'Cooper Alexander',
+    'Brian Kortovich',
+    'Finn Furmanek',
+  ],
+
+  OT: [
+    'Malachi Goodman',
+    'Owen Aliciene',
+    'Mason Bandhauer',
+    'Hunter Albright',
+  ],
+
+  G1: [
+    'Trevor Buhr',
+    'Will Tompkins',
+    'Vaea Ikakoula',
+    'Liam Horan',
+  ],
+
+  C: [
+    'Brock Riker',
+    'Dominic Rulli',
+    'Jim Fitzgerald',
+  ],
+
+  G2: [
+    'Cooper Cousins',
+    'Tyshon Huff',
+    'Donnie Harbour',
+  ],
+
+  T: [
+    'Anthony Donkoh',
+    'Garrett Sexton',
+    'Chimdy Onoh',
+    'Henry Boehme',
+    'Kuol Kuol II',
+  ],
+
+  DE1: [
+    'Yvan Kemajou',
+    'LaVar Arrington II',
+    'Jackson Ford',
+    'Dayshaun Burnett',
+    'Bobby Mears',
+  ],
+
+  DT1: [
+    'Siale Taupaki',
+    'Armstrong Nnodim',
+    'Alijah Carnell',
+    "De'Andre Cook",
+    'Caleb Brewer',
+  ],
+
+  DT2: [
+    'Keanu Williams',
+    'Ty Blanding',
+    'Dallas Vakalahi',
+    'Liam Andrews',
+  ],
+
+  DE2: [
+    'Ikenna Ezeogu',
+    'Max Granville',
+    'Alexander McPherson',
+    'Mason Robinson',
+    'Aidan Probst',
+    'Jordan Mayer',
+  ],
+
+  ILB: [
+    'Kooper Ebel',
+    'Cael Brezina',
+    'Chris Fileppo',
+    'Caleb Bacon',
+  ],
+
+  OLB: [
+    'Tony Rojas',
+    'Cam Smith',
+    'Alex Tatsch',
+    'John Klosterman',
+  ],
+
+  CB: [
+    'Audavion Collins',
+    'Zion Tracy',
+    'Jahmir Joseph',
+    'Joshua Johnson',
+    'Tyler Armstead',
+  ],
+
+  NICKLE: [
+    'Josiah Zayas',
+    'Daryus Dixson',
+    'Xxavier Thomas',
+    'Donte Nastasi',
+    'Tyrell Chatman',
+    'Hunter Sowell',
+    'Max Heffner',
+    'Bryson Williams',
+    'Jashaun Green',
+  ],
+
+  SS: [
+    'Marcus Neal Jr.',
+    'Jamison Patton',
+    'Ibn McDaniels',
+    'Christian Askew',
+  ],
+
+  FS: [
+    'Jeremiah Cooper',
+    'Vaboue Toure',
+    'Omarion Davis',
+  ],
+
+  K: [
+    'Ryan Barker',
+    'Cristiano Rosa',
+    'Matthew Parker',
+  ],
+
+  P: [
+    'Nathan Tiyce',
+  ],
+
+  LS: [
+    'Blaise Sokach-Minnick',
+    'Andrew Dufault',
+  ],
+};
 
 export default function RosterDashboard() {
   const [activeTab, setActiveTab] = useState<
@@ -237,39 +419,11 @@ export default function RosterDashboard() {
   const [depthChartTab, setDepthChartTab] =
     useState<DepthChartTab>('offense');
 
-  const [depthAssignments, setDepthAssignments] =
-    useState<DepthAssignments>({});
-
-  const [draggedPlayerId, setDraggedPlayerId] =
-    useState<number | null>(null);
-
-  const [draggedFromSlot, setDraggedFromSlot] =
-    useState<string | null>(null);
-
   useEffect(() => {
     fetchPlayers();
     fetchStaffData();
     fetchSchedule();
   }, []);
-
-  useEffect(() => {
-    initializeDepthAssignments();
-  }, [players]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (Object.keys(depthAssignments).length === 0) {
-      return;
-    }
-
-    window.localStorage.setItem(
-      'psu-football-depth-chart-v2',
-      JSON.stringify(depthAssignments)
-    );
-  }, [depthAssignments]);
 
   async function fetchPlayers() {
     const { data, error } = await supabase
@@ -279,10 +433,7 @@ export default function RosterDashboard() {
       .order('number', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching players:',
-        error
-      );
+      console.error('Error fetching players:', error);
       return;
     }
 
@@ -296,10 +447,7 @@ export default function RosterDashboard() {
       .order('id', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching staff:',
-        error
-      );
+      console.error('Error fetching staff:', error);
       return;
     }
 
@@ -313,10 +461,7 @@ export default function RosterDashboard() {
       .order('Date', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching schedule:',
-        error
-      );
+      console.error('Error fetching schedule:', error);
       return;
     }
 
@@ -330,10 +475,7 @@ export default function RosterDashboard() {
       .eq('id', id);
 
     if (error) {
-      console.error(
-        'Error saving notes:',
-        error
-      );
+      console.error('Error saving notes:', error);
       return;
     }
 
@@ -381,14 +523,16 @@ export default function RosterDashboard() {
           .includes(search);
 
       return (
-        matchesPosition && matchesSearch
+        matchesPosition &&
+        matchesSearch
       );
     })
     .sort((a, b) => {
       let comparison = 0;
 
       if (sortBy === 'number') {
-        comparison = a.number - b.number;
+        comparison =
+          a.number - b.number;
       } else {
         comparison =
           a.name.localeCompare(b.name);
@@ -409,190 +553,6 @@ export default function RosterDashboard() {
         .includes(search.toLowerCase())
   );
 
-  function initializeDepthAssignments() {
-    if (players.length === 0) {
-      return;
-    }
-
-    const validPlayerIds = new Set(
-      players.map((player) => player.id)
-    );
-
-    let saved: DepthAssignments | null =
-      null;
-
-    if (typeof window !== 'undefined') {
-      try {
-        const stored =
-          window.localStorage.getItem(
-            'psu-football-depth-chart-v2'
-          );
-
-        if (stored) {
-          const parsed = JSON.parse(
-            stored
-          );
-
-          if (
-            parsed &&
-            typeof parsed === 'object' &&
-            !Array.isArray(parsed)
-          ) {
-            saved =
-              parsed as DepthAssignments;
-          }
-        }
-      } catch (error) {
-        console.error(
-          'Error loading depth chart:',
-          error
-        );
-      }
-    }
-
-    const cleaned: DepthAssignments = {};
-
-    if (saved) {
-      if (
-        Array.isArray(saved.MIKE) &&
-        !Array.isArray(saved.ILB)
-      ) {
-        saved.ILB = saved.MIKE;
-      }
-
-      if (!Array.isArray(saved.OLB)) {
-        saved.OLB = [
-          ...(Array.isArray(saved.WILL)
-            ? saved.WILL
-            : []),
-          ...(Array.isArray(saved.SAM)
-            ? saved.SAM
-            : []),
-        ];
-      }
-    }
-
-    ALL_DEPTH_SLOTS.forEach((slot) => {
-      const ids: number[] =
-        saved &&
-        Array.isArray(saved[slot.id])
-          ? saved[slot.id]
-          : [];
-
-      cleaned[slot.id] = ids.filter(
-        (id, index, array) =>
-          validPlayerIds.has(id) &&
-          array.indexOf(id) === index
-      );
-    });
-
-    const assignedIds = new Set(
-      Object.values(cleaned).flat()
-    );
-
-    const unassignedPlayers =
-      players.filter(
-        (player) =>
-          !assignedIds.has(player.id)
-      );
-
-    const addToSlot = (
-      slotId: string,
-      player: Player
-    ) => {
-      if (!cleaned[slotId]) {
-        cleaned[slotId] = [];
-      }
-
-      if (
-        !cleaned[slotId].includes(
-          player.id
-        )
-      ) {
-        cleaned[slotId].push(
-          player.id
-        );
-
-        assignedIds.add(player.id);
-      }
-    };
-
-    const addPlayersToSlots = (
-      playerPosition: string,
-      slotIds: string[]
-    ) => {
-      const availablePlayers =
-        unassignedPlayers.filter(
-          (player) =>
-            player.position ===
-              playerPosition &&
-            !assignedIds.has(
-              player.id
-            )
-        );
-
-      availablePlayers.forEach(
-        (player, index) => {
-          const slotId =
-            slotIds[
-              index % slotIds.length
-            ];
-
-          addToSlot(
-            slotId,
-            player
-          );
-        }
-      );
-    };
-
-    addPlayersToSlots('QB', ['QB']);
-    addPlayersToSlots('RB', ['RB']);
-
-    addPlayersToSlots(
-      'WR',
-      ['X', 'Y', 'Z']
-    );
-
-    addPlayersToSlots('TE', ['TE']);
-
-    addPlayersToSlots(
-      'OL',
-      ['OT', 'G1', 'C', 'G2', 'T']
-    );
-
-    addPlayersToSlots(
-      'DE',
-      ['DE1', 'DE2']
-    );
-
-    addPlayersToSlots(
-      'DT',
-      ['DT1', 'DT2']
-    );
-
-    addPlayersToSlots(
-      'LB',
-      ['ILB', 'OLB']
-    );
-
-    addPlayersToSlots(
-      'CB',
-      ['CB', 'NICKLE']
-    );
-
-    addPlayersToSlots(
-      'S',
-      ['SS', 'FS', 'NICKLE']
-    );
-
-    addPlayersToSlots('K', ['K']);
-    addPlayersToSlots('P', ['P']);
-    addPlayersToSlots('LS', ['LS']);
-
-    setDepthAssignments(cleaned);
-  }
-
   function getSlotsForTab(
     tab: DepthChartTab
   ): DepthSlot[] {
@@ -605,6 +565,35 @@ export default function RosterDashboard() {
     }
 
     return SPECIAL_TEAMS_SLOTS;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Depth Chart Helpers
+  |--------------------------------------------------------------------------
+  */
+
+  function normalizePlayerName(
+    name: string
+  ) {
+    return name
+      .toLowerCase()
+      .replace(/[’‘`]/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function getPlayerByName(
+    playerName: string
+  ): Player | undefined {
+    const normalizedTarget =
+      normalizePlayerName(playerName);
+
+    return players.find(
+      (player) =>
+        normalizePlayerName(player.name) ===
+        normalizedTarget
+    );
   }
 
   function getDepthChartPlayers(
@@ -636,11 +625,13 @@ export default function RosterDashboard() {
       ];
     }
 
-    const assignedPlayerIds =
+    const assignedPlayerNames =
       new Set(
         Object.values(
-          depthAssignments
-        ).flat()
+          STATIC_DEPTH_ASSIGNMENTS
+        )
+          .flat()
+          .map(normalizePlayerName)
       );
 
     return players.filter(
@@ -648,226 +639,25 @@ export default function RosterDashboard() {
         positionPool.includes(
           player.position
         ) &&
-        !assignedPlayerIds.has(
-          player.id
+        !assignedPlayerNames.has(
+          normalizePlayerName(
+            player.name
+          )
         )
     );
   }
 
-  function getPlayerById(
-    playerId: number
-  ): Player | undefined {
-    return players.find(
-      (player) =>
-        player.id === playerId
-    );
-  }
-
-  function playerCanEnterSlot(
-    player: Player,
-    slot: DepthSlot
-  ) {
-    return slot.eligiblePositions.includes(
-      player.position
-    );
-  }
-
-  function removePlayerFromAllSlots(
-    playerId: number,
-    assignments: DepthAssignments
-  ) {
-    Object.keys(assignments).forEach(
-      (slotId) => {
-        assignments[slotId] =
-          assignments[slotId].filter(
-            (id) =>
-              id !== playerId
-          );
-      }
-    );
-  }
-
-  function movePlayerToSlot(
-    playerId: number,
-    slotId: string,
-    targetIndex?: number
-  ) {
-    const slot =
-      ALL_DEPTH_SLOTS.find(
-        (item) =>
-          item.id === slotId
-      );
-
-    const player =
-      getPlayerById(playerId);
-
-    if (!slot || !player) {
-      return;
-    }
-
-    if (
-      !playerCanEnterSlot(
-        player,
-        slot
-      )
-    ) {
-      return;
-    }
-
-    setDepthAssignments(
-      (currentAssignments) => {
-        const nextAssignments: DepthAssignments =
-          {};
-
-        Object.keys(
-          currentAssignments
-        ).forEach((key) => {
-          nextAssignments[key] = [
-            ...(currentAssignments[
-              key
-            ] || []),
-          ];
-        });
-
-        ALL_DEPTH_SLOTS.forEach(
-          (item) => {
-            if (
-              !nextAssignments[
-                item.id
-              ]
-            ) {
-              nextAssignments[
-                item.id
-              ] = [];
-            }
-          }
-        );
-
-        removePlayerFromAllSlots(
-          playerId,
-          nextAssignments
-        );
-
-        const destination =
-          nextAssignments[
-            slotId
-          ] || [];
-
-        const insertAt =
-          typeof targetIndex ===
-          'number'
-            ? Math.max(
-                0,
-                Math.min(
-                  targetIndex,
-                  destination.length
-                )
-              )
-            : destination.length;
-
-        destination.splice(
-          insertAt,
-          0,
-          playerId
-        );
-
-        nextAssignments[
-          slotId
-        ] = destination;
-
-        return nextAssignments;
-      }
-    );
-  }
-
-  function handleDragStart(
-    playerId: number,
-    fromSlot: string | null
-  ) {
-    setDraggedPlayerId(
-      playerId
-    );
-
-    setDraggedFromSlot(
-      fromSlot
-    );
-  }
-
-  function handleDragEnd() {
-    setDraggedPlayerId(null);
-    setDraggedFromSlot(null);
-  }
-
-  function handleDropOnSlot(
-    slotId: string,
-    event: React.DragEvent<HTMLDivElement>
-  ) {
-    event.preventDefault();
-
-    if (
-      draggedPlayerId === null
-    ) {
-      return;
-    }
-
-    movePlayerToSlot(
-      draggedPlayerId,
-      slotId
-    );
-
-    handleDragEnd();
-  }
-
-  function handleDropOnPlayer(
-    slotId: string,
-    targetIndex: number,
-    event: React.DragEvent<HTMLDivElement>
-  ) {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (
-      draggedPlayerId === null
-    ) {
-      return;
-    }
-
-    movePlayerToSlot(
-      draggedPlayerId,
-      slotId,
-      targetIndex
-    );
-
-    handleDragEnd();
-  }
-
   function renderPlayerCard(
     player: Player,
-    fromSlot: string | null,
     compact = false
   ) {
     return (
       <div
         key={player.id}
-        draggable
-        onDragStart={(event) => {
-          event.stopPropagation();
-
-          handleDragStart(
-            player.id,
-            fromSlot
-          );
-        }}
-        onDragEnd={handleDragEnd}
-        className={`cursor-grab rounded-xl border border-white/10 bg-slate-900/90 transition hover:border-blue-400/50 hover:bg-slate-800/90 active:cursor-grabbing ${
+        className={`rounded-xl border border-white/10 bg-slate-900/90 ${
           compact
             ? 'p-3'
             : 'p-4'
-        } ${
-          draggedPlayerId ===
-          player.id
-            ? 'opacity-40'
-            : ''
         }`}
       >
         <div className="flex items-center gap-3">
@@ -887,10 +677,6 @@ export default function RosterDashboard() {
                 : ''}
             </div>
           </div>
-
-          <div className="text-slate-600">
-            ⋮⋮
-          </div>
         </div>
       </div>
     );
@@ -899,23 +685,14 @@ export default function RosterDashboard() {
   function renderDepthSlot(
     slot: DepthSlot
   ) {
-    const assignedIds =
-      depthAssignments[
+    const assignedPlayers =
+      STATIC_DEPTH_ASSIGNMENTS[
         slot.id
       ] || [];
 
     return (
       <div
         key={slot.id}
-        onDragOver={(event) => {
-          event.preventDefault();
-        }}
-        onDrop={(event) =>
-          handleDropOnSlot(
-            slot.id,
-            event
-          )
-        }
         className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
       >
         <div className="mb-3 flex items-center justify-between">
@@ -937,58 +714,55 @@ export default function RosterDashboard() {
         </div>
 
         <div className="space-y-2">
-          {assignedIds.length ===
+          {assignedPlayers.length ===
           0 ? (
             <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-5 text-center text-xs text-slate-600">
-              Drag player here
+              No player assigned
             </div>
           ) : (
-            assignedIds.map(
+            assignedPlayers.map(
               (
-                playerId,
+                playerName,
                 index
               ) => {
                 const player =
-                  getPlayerById(
-                    playerId
+                  getPlayerByName(
+                    playerName
                   );
 
                 if (!player) {
-                  return null;
+                  return (
+                    <div
+                      key={`${slot.id}-${playerName}`}
+                      className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3"
+                    >
+                      <div className="text-xs font-semibold text-red-400">
+                        Player not found
+                      </div>
+
+                      <div className="mt-1 text-sm text-slate-400">
+                        {playerName}
+                      </div>
+                    </div>
+                  );
                 }
 
                 return (
                   <div
                     key={`${slot.id}-${player.id}`}
-                    onDragOver={(
-                      event
-                    ) => {
-                      event.preventDefault();
-                    }}
-                    onDrop={(event) =>
-                      handleDropOnPlayer(
-                        slot.id,
-                        index,
-                        event
-                      )
-                    }
                   >
                     <div className="mb-1 ml-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      {index ===
-                      0
+                      {index === 0
                         ? '1st String'
-                        : index ===
-                          1
-                          ? '2nd String'
-                          : index ===
-                            2
-                            ? '3rd String'
-                            : `${index + 1}th String`}
+                        : index === 1
+                        ? '2nd String'
+                        : index === 2
+                        ? '3rd String'
+                        : `${index + 1}th String`}
                     </div>
 
                     {renderPlayerCard(
                       player,
-                      slot.id,
                       true
                     )}
                   </div>
@@ -1001,54 +775,23 @@ export default function RosterDashboard() {
     );
   }
 
-  function resetDepthChart() {
-    if (
-      typeof window !==
-      'undefined'
-    ) {
-      window.localStorage.removeItem(
-        'psu-football-depth-chart-v2'
-      );
-    }
-
-    setDepthAssignments({});
-  }
-
   function renderDepthChart() {
     const slots =
       getSlotsForTab(
         depthChartTab
       );
 
-    const availablePlayers =
-      getDepthChartPlayers(
-        depthChartTab
-      ).sort(
-        (a, b) =>
-          a.position.localeCompare(
-            b.position
-          ) ||
-          a.name.localeCompare(
-            b.name
-          )
-      );
-
     return (
       <div className="space-y-6">
         <div className="glass-panel rounded-2xl p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-white">
-                Depth Chart
-              </h2>
+          <div>
+            <h2 className="text-xl font-bold text-white">
+              Depth Chart
+            </h2>
 
-              <p className="mt-1 text-sm text-slate-400">
-                Drag players into
-                position groups and
-                arrange them by
-                string.
-              </p>
-            </div>
+            <p className="mt-1 text-sm text-slate-400">
+              2026 Penn State depth chart
+            </p>
           </div>
 
           <div className="mt-5 flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5">
@@ -1102,49 +845,13 @@ export default function RosterDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
-          <div className="glass-panel rounded-2xl p-4">
-            <div className="mb-4">
-              <h3 className="font-bold text-white">
-                Available Players
-              </h3>
-
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Players disappear
-                from this list once
-                assigned to a
-                position.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              {availablePlayers.length ===
-              0 ? (
-                <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-6 text-center text-xs text-slate-600">
-                  All eligible
-                  players are
-                  assigned.
-                </div>
-              ) : (
-                availablePlayers.map(
-                  (player) =>
-                    renderPlayerCard(
-                      player,
-                      null,
-                      true
-                    )
-                )
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {slots.map((slot) =>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {slots.map(
+            (slot) =>
               renderDepthSlot(
                 slot
               )
-            )}
-          </div>
+          )}
         </div>
       </div>
     );
@@ -1285,7 +992,7 @@ export default function RosterDashboard() {
       new Set(
         relevantSlots.flatMap(
           (slot) =>
-            depthAssignments[
+            STATIC_DEPTH_ASSIGNMENTS[
               slot.id
             ] || []
         )
@@ -1295,7 +1002,7 @@ export default function RosterDashboard() {
       positionPlayers.filter(
         (player) =>
           !assignedToRelevantSlots.has(
-            player.id
+            player.name
           )
       );
 
@@ -1305,14 +1012,11 @@ export default function RosterDashboard() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-bold text-white">
-                {position} Depth
-                Chart
+                {position} Depth Chart
               </h2>
 
               <p className="text-sm text-slate-400">
-                Drag players into
-                the appropriate
-                role.
+                Static depth chart
               </p>
             </div>
 
@@ -1331,8 +1035,7 @@ export default function RosterDashboard() {
               </h3>
 
               <p className="mt-1 text-xs text-slate-500">
-                Drag a player into
-                a role.
+                Players not currently assigned.
               </p>
             </div>
 
@@ -1340,15 +1043,13 @@ export default function RosterDashboard() {
               {availablePlayers.length ===
               0 ? (
                 <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-6 text-center text-xs text-slate-600">
-                  All players
-                  assigned.
+                  All players assigned.
                 </div>
               ) : (
                 availablePlayers.map(
                   (player) =>
                     renderPlayerCard(
                       player,
-                      null,
                       true
                     )
                 )
@@ -1373,15 +1074,12 @@ export default function RosterDashboard() {
     <div className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
       <header className="mx-auto mb-8 max-w-7xl">
         <h1 className="mb-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          2026 Football
-          Dashboard
+          2026 Football Dashboard
         </h1>
 
         <p className="max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-          Manage player roster,
-          scouting notes, coaching
-          personnel, schedule, and
-          depth chart.
+          Manage player roster, scouting notes, coaching personnel, schedule,
+          and depth chart.
         </p>
       </header>
 
@@ -1389,13 +1087,10 @@ export default function RosterDashboard() {
         <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur sm:w-fit">
           <button
             onClick={() =>
-              setActiveTab(
-                'roster'
-              )
+              setActiveTab('roster')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab ===
-              'roster'
+              activeTab === 'roster'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1405,13 +1100,10 @@ export default function RosterDashboard() {
 
           <button
             onClick={() =>
-              setActiveTab(
-                'coaching'
-              )
+              setActiveTab('coaching')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab ===
-              'coaching'
+              activeTab === 'coaching'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1421,13 +1113,10 @@ export default function RosterDashboard() {
 
           <button
             onClick={() =>
-              setActiveTab(
-                'schedule'
-              )
+              setActiveTab('schedule')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab ===
-              'schedule'
+              activeTab === 'schedule'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1437,13 +1126,10 @@ export default function RosterDashboard() {
 
           <button
             onClick={() =>
-              setActiveTab(
-                'depth-chart'
-              )
+              setActiveTab('depth-chart')
             }
             className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab ===
-              'depth-chart'
+              activeTab === 'depth-chart'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
                 : 'text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
@@ -1452,17 +1138,14 @@ export default function RosterDashboard() {
           </button>
         </div>
 
-        {activeTab ===
-          'roster' && (
+        {activeTab === 'roster' && (
           <>
             <div className="glass-panel flex flex-col items-center justify-between gap-4 rounded-2xl p-4 md:flex-row">
               <div className="flex flex-wrap items-center gap-1">
                 {POSITIONS.map(
                   (position) => (
                     <button
-                      key={
-                        position
-                      }
+                      key={position}
                       onClick={() =>
                         setSelectedPosition(
                           position
@@ -1475,9 +1158,7 @@ export default function RosterDashboard() {
                           : 'border-transparent bg-white/[0.04] text-slate-400 hover:border-white/10 hover:bg-white/[0.08] hover:text-slate-100'
                       }`}
                     >
-                      {
-                        position
-                      }
+                      {position}
                     </button>
                   )
                 )}
@@ -1532,16 +1213,10 @@ export default function RosterDashboard() {
                 <input
                   type="text"
                   placeholder="Search name or jersey #..."
-                  value={
-                    search
-                  }
-                  onChange={(
-                    event
-                  ) =>
+                  value={search}
+                  onChange={(event) =>
                     setSearch(
-                      event
-                        .target
-                        .value
+                      event.target.value
                     )
                   }
                   className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
@@ -1563,8 +1238,7 @@ export default function RosterDashboard() {
                           )
                         }
                       >
-                        #{' '}
-                        {sortBy ===
+                        # {sortBy ===
                           'number' &&
                           (sortOrder ===
                           'asc'
@@ -1602,8 +1276,7 @@ export default function RosterDashboard() {
                       </th>
 
                       <th className="p-4">
-                        Hometown /
-                        Prev. School
+                        Hometown / Prev. School
                       </th>
 
                       <th className="w-72 p-4">
@@ -1622,10 +1295,7 @@ export default function RosterDashboard() {
                           className="transition hover:bg-blue-500/[0.04]"
                         >
                           <td className="p-4 font-mono font-bold text-slate-400">
-                            #
-                            {
-                              player.number
-                            }
+                            #{player.number}
                           </td>
 
                           <td className="p-4 font-semibold text-white">
@@ -1633,50 +1303,33 @@ export default function RosterDashboard() {
                               href={`/player/${player.id}`}
                               className="text-blue-400 transition hover:text-blue-300 hover:underline"
                             >
-                              {
-                                player.name
-                              }
+                              {player.name}
                             </Link>
                           </td>
 
                           <td className="p-4">
                             <span className="rounded-md border border-blue-400/15 bg-blue-500/10 px-2 py-1 text-xs font-bold text-blue-300">
-                              {
-                                player.position
-                              }
+                              {player.position}
                             </span>
                           </td>
 
                           <td className="p-4 text-slate-300">
-                            {
-                              player.eligibility
-                            }
+                            {player.eligibility}
                           </td>
 
                           <td className="p-4 text-slate-300">
-                            {
-                              player.height
-                            }
-                            ,{' '}
-                            {
-                              player.weight
-                            }{' '}
-                            lbs
+                            {player.height}, {player.weight} lbs
                           </td>
 
                           <td className="p-4 text-xs text-slate-400">
                             <div>
-                              {
-                                player.hometown
-                              }
+                              {player.hometown}
                             </div>
 
                             {player.previous_school && (
                               <div className="text-blue-400">
                                 Ex:{' '}
-                                {
-                                  player.previous_school
-                                }
+                                {player.previous_school}
                               </div>
                             )}
                           </td>
@@ -1719,7 +1372,6 @@ export default function RosterDashboard() {
                                   setEditingNotesId(
                                     player.id
                                   );
-
                                   setTempNotes(
                                     player.notes ||
                                       ''
@@ -1727,13 +1379,11 @@ export default function RosterDashboard() {
                                 }}
                                 className="flex min-h-[1.5rem] cursor-pointer items-center text-xs italic text-slate-300 hover:text-white"
                               >
-                                {player.notes ||
-                                  (
-                                    <span className="not-italic text-slate-500">
-                                      + Add
-                                      notes...
-                                    </span>
-                                  )}
+                                {player.notes || (
+                                  <span className="not-italic text-slate-500">
+                                    + Add notes...
+                                  </span>
+                                )}
                               </div>
                             )}
                           </td>
@@ -1751,26 +1401,20 @@ export default function RosterDashboard() {
           </>
         )}
 
-        {activeTab ===
-          'coaching' && (
+        {activeTab === 'coaching' && (
           <div className="space-y-6">
             <div className="glass-panel flex flex-col items-start justify-between gap-4 rounded-2xl p-4 sm:flex-row sm:items-center">
               <h2 className="text-lg font-semibold text-white">
-                Coaching & Support
-                Personnel
+                Coaching & Support Personnel
               </h2>
 
               <input
                 type="text"
                 placeholder="Search staff or title..."
-                value={
-                  search
-                }
+                value={search}
                 onChange={(event) =>
                   setSearch(
-                    event
-                      .target
-                      .value
+                    event.target.value
                   )
                 }
                 className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
@@ -1788,29 +1432,21 @@ export default function RosterDashboard() {
                   >
                     <div>
                       <h3 className="mb-1 text-lg font-bold text-white">
-                        {
-                          member.name
-                        }
+                        {member.name}
                       </h3>
 
                       <p className="text-sm font-medium text-blue-400">
-                        {
-                          member.title
-                        }
+                        {member.title}
                       </p>
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-700/50 pt-3 text-xs text-slate-500">
                       <span>
-                        Staff ID: #
-                        {
-                          member.id
-                        }
+                        Staff ID: #{member.id}
                       </span>
 
                       <span className="text-slate-400">
-                        Football
-                        Operations
+                        Football Operations
                       </span>
                     </div>
                   </div>
@@ -1820,8 +1456,7 @@ export default function RosterDashboard() {
           </div>
         )}
 
-        {activeTab ===
-          'schedule' && (
+        {activeTab === 'schedule' && (
           <div className="glass-panel overflow-x-auto rounded-2xl p-6">
             <h2 className="mb-4 text-xl font-bold text-white">
               2026 Season Schedule
@@ -1866,9 +1501,7 @@ export default function RosterDashboard() {
                       className="transition hover:bg-blue-500/[0.04]"
                     >
                       <td className="p-3 font-mono font-bold text-blue-400">
-                        {
-                          game.Date
-                        }
+                        {game.Date}
                       </td>
 
                       <td className="p-3 text-slate-300">
@@ -1886,23 +1519,17 @@ export default function RosterDashboard() {
                             href={`/matchup/${game.id}`}
                             className="text-blue-400 transition hover:text-blue-300 hover:underline"
                           >
-                            {
-                              game.Opponent
-                            }
+                            {game.Opponent}
                           </Link>
                         ) : (
                           <span className="text-white">
-                            {
-                              game.Opponent
-                            }
+                            {game.Opponent}
                           </span>
                         )}
                       </td>
 
                       <td className="p-3 text-slate-300">
-                        {
-                          game.Location
-                        }
+                        {game.Location}
                       </td>
 
                       <td className="p-3 text-xs italic text-slate-400">
