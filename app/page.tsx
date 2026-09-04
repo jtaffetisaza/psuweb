@@ -16,7 +16,6 @@ interface Player {
   high_school: string;
   previous_school: string;
   notes: string;
-
   star_rating: number | null;
   recruiting_class: number | null;
   national_rank: number | null;
@@ -199,18 +198,6 @@ const SPECIAL_TEAMS_SLOTS: DepthSlot[] = [
     eligiblePositions: ['LS'],
   },
 ];
-
-/*
-|--------------------------------------------------------------------------
-| 2026 PENN STATE DEPTH CHART
-|--------------------------------------------------------------------------
-|
-| IMPORTANT:
-| These assignments use PLAYER NAMES, not database IDs or jersey numbers.
-| This prevents duplicate jersey numbers from causing incorrect players
-| to appear in the depth chart.
-|
-*/
 
 const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
   QB: [
@@ -433,7 +420,10 @@ export default function RosterDashboard() {
       .order('number', { ascending: true });
 
     if (error) {
-      console.error('Error fetching players:', error);
+      console.error(
+        'Error fetching players:',
+        error
+      );
       return;
     }
 
@@ -447,7 +437,10 @@ export default function RosterDashboard() {
       .order('id', { ascending: true });
 
     if (error) {
-      console.error('Error fetching staff:', error);
+      console.error(
+        'Error fetching staff:',
+        error
+      );
       return;
     }
 
@@ -461,7 +454,10 @@ export default function RosterDashboard() {
       .order('Date', { ascending: true });
 
     if (error) {
-      console.error('Error fetching schedule:', error);
+      console.error(
+        'Error fetching schedule:',
+        error
+      );
       return;
     }
 
@@ -475,7 +471,10 @@ export default function RosterDashboard() {
       .eq('id', id);
 
     if (error) {
-      console.error('Error saving notes:', error);
+      console.error(
+        'Error saving notes:',
+        error
+      );
       return;
     }
 
@@ -567,12 +566,6 @@ export default function RosterDashboard() {
     return SPECIAL_TEAMS_SLOTS;
   }
 
-  /*
-  |--------------------------------------------------------------------------
-  | Depth Chart Helpers
-  |--------------------------------------------------------------------------
-  */
-
   function normalizePlayerName(
     name: string
   ) {
@@ -651,14 +644,14 @@ export default function RosterDashboard() {
     player: Player,
     compact = false
   ) {
+    const cardPadding = compact
+      ? 'p-3'
+      : 'p-4';
+
     return (
       <div
         key={player.id}
-        className={`rounded-xl border border-white/10 bg-slate-900/90 ${
-          compact
-            ? 'p-3'
-            : 'p-4'
-        }`}
+        className={`rounded-xl border border-white/10 bg-slate-900/90 ${cardPadding}`}
       >
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 font-mono text-sm font-bold text-blue-300">
@@ -666,9 +659,12 @@ export default function RosterDashboard() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold text-white">
+            <Link
+              href={`/player/${player.id}`}
+              className="block truncate font-semibold text-white transition hover:text-blue-400 hover:underline"
+            >
               {player.name}
-            </div>
+            </Link>
 
             <div className="mt-0.5 text-xs text-slate-500">
               {player.position}
@@ -714,8 +710,7 @@ export default function RosterDashboard() {
         </div>
 
         <div className="space-y-2">
-          {assignedPlayers.length ===
-          0 ? (
+          {assignedPlayers.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-5 text-center text-xs text-slate-600">
               No player assigned
             </div>
@@ -747,18 +742,30 @@ export default function RosterDashboard() {
                   );
                 }
 
+                let stringLabel =
+                  `${index + 1}th String`;
+
+                if (index === 0) {
+                  stringLabel =
+                    '1st String';
+                } else if (
+                  index === 1
+                ) {
+                  stringLabel =
+                    '2nd String';
+                } else if (
+                  index === 2
+                ) {
+                  stringLabel =
+                    '3rd String';
+                }
+
                 return (
                   <div
                     key={`${slot.id}-${player.id}`}
                   >
                     <div className="mb-1 ml-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      {index === 0
-                        ? '1st String'
-                        : index === 1
-                        ? '2nd String'
-                        : index === 2
-                        ? '3rd String'
-                        : `${index + 1}th String`}
+                      {stringLabel}
                     </div>
 
                     {renderPlayerCard(
@@ -853,6 +860,27 @@ export default function RosterDashboard() {
               )
           )}
         </div>
+
+        {getDepthChartPlayers(
+          depthChartTab
+        ).length > 0 && (
+          <div className="glass-panel rounded-2xl p-4">
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
+              Unassigned Players
+            </h3>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {getDepthChartPlayers(
+                depthChartTab
+              ).map((player) =>
+                renderPlayerCard(
+                  player,
+                  true
+                )
+              )}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -860,8 +888,7 @@ export default function RosterDashboard() {
   function renderPositionEditor(
     position: string
   ) {
-    let relevantSlots: DepthSlot[] =
-      [];
+    let relevantSlots: DepthSlot[] = [];
 
     if (position === 'QB') {
       relevantSlots =
@@ -990,19 +1017,25 @@ export default function RosterDashboard() {
 
     const assignedToRelevantSlots =
       new Set(
-        relevantSlots.flatMap(
-          (slot) =>
-            STATIC_DEPTH_ASSIGNMENTS[
-              slot.id
-            ] || []
-        )
+        relevantSlots
+          .flatMap(
+            (slot) =>
+              STATIC_DEPTH_ASSIGNMENTS[
+                slot.id
+              ] || []
+          )
+          .map(
+            normalizePlayerName
+          )
       );
 
     const availablePlayers =
       positionPlayers.filter(
         (player) =>
           !assignedToRelevantSlots.has(
-            player.name
+            normalizePlayerName(
+              player.name
+            )
           )
       );
 
@@ -1078,8 +1111,9 @@ export default function RosterDashboard() {
         </h1>
 
         <p className="max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-          Manage player roster, scouting notes, coaching personnel, schedule,
-          and depth chart.
+          Manage player roster, scouting notes,
+          coaching personnel, schedule, and depth
+          chart.
         </p>
       </header>
 
@@ -1318,7 +1352,8 @@ export default function RosterDashboard() {
                           </td>
 
                           <td className="p-4 text-slate-300">
-                            {player.height}, {player.weight} lbs
+                            {player.height},{' '}
+                            {player.weight} lbs
                           </td>
 
                           <td className="p-4 text-xs text-slate-400">
@@ -1329,7 +1364,9 @@ export default function RosterDashboard() {
                             {player.previous_school && (
                               <div className="text-blue-400">
                                 Ex:{' '}
-                                {player.previous_school}
+                                {
+                                  player.previous_school
+                                }
                               </div>
                             )}
                           </td>
@@ -1442,7 +1479,8 @@ export default function RosterDashboard() {
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-700/50 pt-3 text-xs text-slate-500">
                       <span>
-                        Staff ID: #{member.id}
+                        Staff ID: #
+                        {member.id}
                       </span>
 
                       <span className="text-slate-400">
@@ -1519,11 +1557,15 @@ export default function RosterDashboard() {
                             href={`/matchup/${game.id}`}
                             className="text-blue-400 transition hover:text-blue-300 hover:underline"
                           >
-                            {game.Opponent}
+                            {
+                              game.Opponent
+                            }
                           </Link>
                         ) : (
                           <span className="text-white">
-                            {game.Opponent}
+                            {
+                              game.Opponent
+                            }
                           </span>
                         )}
                       </td>
@@ -1544,8 +1586,7 @@ export default function RosterDashboard() {
           </div>
         )}
 
-        {activeTab ===
-          'depth-chart' &&
+        {activeTab === 'depth-chart' &&
           renderDepthChart()}
       </main>
     </div>
