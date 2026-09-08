@@ -19,14 +19,6 @@ interface CFBDGame {
   awayTeam: string;
 }
 
-interface CFBDStat {
-  athleteId?: number;
-  athleteName?: string;
-  category: string;
-  type: string;
-  stat: string;
-}
-
 interface CFBDPlayerStats {
   id: number;
   name: string;
@@ -109,10 +101,7 @@ async function cfbdFetch<T>(
 export async function GET(request: Request) {
   try {
     /*
-     * Protect the endpoint.
-     *
-     * Vercel Cron will send:
-     * Authorization: Bearer <CRON_SECRET>
+     * Protect the endpoint with CRON_SECRET when configured.
      */
     const cronSecret = process.env.CRON_SECRET;
 
@@ -128,7 +117,8 @@ export async function GET(request: Request) {
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY;
     const cfbdApiKey = process.env.CFBD_API_KEY;
 
     if (!supabaseUrl) {
@@ -151,10 +141,16 @@ export async function GET(request: Request) {
     const results = [];
 
     for (const season of SEASONS) {
-      console.log(`Starting ${season} player stats import...`);
+      console.log(
+        `Starting ${season} player stats import...`
+      );
 
       /*
-       * 1. Get Penn State's completed games.
+       * ---------------------------------------------------------
+       * 1. Get Penn State's games for the season.
+       *
+       * This is ONE CFBD call.
+       * ---------------------------------------------------------
        */
       const games = await cfbdFetch<CFBDGame[]>(
         '/games',
@@ -169,7 +165,8 @@ export async function GET(request: Request) {
       const completedGames = games.filter(
         (game) =>
           game.completed &&
-          (game.homeTeam === TEAM || game.awayTeam === TEAM)
+          (game.homeTeam === TEAM ||
+            game.awayTeam === TEAM)
       );
 
       console.log(
@@ -179,7 +176,8 @@ export async function GET(request: Request) {
       if (completedGames.length === 0) {
         results.push({
           season,
-          games: 0,
+          completedGames: 0,
+          newGames: 0,
           players: 0,
           status: 'no_completed_games',
         });
@@ -188,13 +186,16 @@ export async function GET(request: Request) {
       }
 
       /*
-       * 2. Load our Penn State roster.
+       * ---------------------------------------------------------
+       * 2. Get our Penn State roster.
+       * ---------------------------------------------------------
        */
-      const { data: players, error: playersError } = await supabase
-        .from('players')
-        .select(
-          'id, name, position, cfbd_player_id'
-        );
+      const { data: players, error: playersError } =
+        await supabase
+          .from('players')
+          .select(
+            'id, name, position, cfbd_player_id'
+          );
 
       if (playersError) {
         throw new Error(
@@ -202,14 +203,14 @@ export async function GET(request: Request) {
         );
       }
 
-      const playerRows = (players || []) as PlayerRow[];
+      const playerRows =
+        (players || []) as PlayerRow[];
 
-      /*
-       * Match players primarily by CFBD ID.
-       * Fall back to normalized name.
-       */
-      const playersByCfbdId = new Map<string, PlayerRow>();
-      const playersByName = new Map<string, PlayerRow>();
+      const playersByCfbdId =
+        new Map<string, PlayerRow>();
+
+      const playersByName =
+        new Map<string, PlayerRow>();
 
       for (const player of playerRows) {
         if (player.cfbd_player_id) {
@@ -226,23 +227,170 @@ export async function GET(request: Request) {
       }
 
       /*
-       * 3. Collect stats across every completed game.
+       * ---------------------------------------------------------
+       * 3. Determine which games have already been imported.
+       *
+       * We store the CFBD game IDs inside the stats JSON under:
+       *
+       * stats._imported_game_ids
+       *
+       * This allows us to know exactly which games have already
+       * been processed without adding another Supabase table.
+       * ---------------------------------------------------------
        */
-      const playerRecords = new Map<number, PlayerRecord>();
+      const {
+        data: existingStats,
+        error: existingStatsError,
+      } = await supabase
+        .from('player_season_stats')
+        .select('player_id, stats')
+        .eq('season', season)
+        .eq('team', TEAM);
 
-      for (const game of completedGames) {
-        console.log(
-          `Importing player stats for game ${game.id} (${game.homeTeam} vs ${game.awayTeam})`
+      if (existingStatsError) {
+        throw new Error(
+          `Failed to check existing stats: ${existingStatsError.message}`
         );
+      }
 
-        const gamePlayers = await cfbdFetch<CFBDPlayerStats[]>(
-          '/games/players',
-          cfbdApiKey,
-          {
-            year: String(season),
-            gameId: String(game.id),
+      const importedGameIds =
+        new Set<number>();
+
+      for (const row of existingStats || []) {
+        const stats = row.stats;
+
+        if (
+          stats &&
+          typeof stats === 'object' &&
+          !Array.isArray(stats)
+        ) {
+          const importedIds =
+            stats._imported_game_ids;
+
+          if (Array.isArray(importedIds)) {
+            for (const id of importedIds) {
+              const numericId = Number(id);
+
+              if (!Number.isNaN(numericId)) {
+                importedGameIds.add(numericId);
+              }
+            }
           }
+        }
+      }
+
+      /*
+       * Only process games that aren't already imported.
+       */
+      const newGames = completedGames.filter(
+        (game) => !importedGameIds.has(game.id)
+      );
+
+      console.log(
+        `Already imported games: ${importedGameIds.size}`
+      );
+
+      console.log(
+        `New games requiring CFBD player-stat calls: ${newGames.length}`
+      );
+
+      /*
+       * Nothing new to import.
+       */
+      if (newGames.length === 0) {
+        results.push({
+          season,
+          completedGames: completedGames.length,
+          newGames: 0,
+          players: 0,
+          status: 'already_up_to_date',
+        });
+
+        continue;
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 4. Load existing player-season totals.
+       *
+       * We need these because we're adding the new game's stats
+       * to the existing season totals.
+       * ---------------------------------------------------------
+       */
+      const existingByPlayer =
+        new Map<number, PlayerRecord>();
+
+      for (const row of existingStats || []) {
+        const player = playerRows.find(
+          (p) => p.id === row.player_id
         );
+
+        if (!player) continue;
+
+        const existingStatsObject =
+          row.stats &&
+          typeof row.stats === 'object' &&
+          !Array.isArray(row.stats)
+            ? { ...row.stats }
+            : {};
+
+        /*
+         * Remove our internal tracking field from the actual
+         * statistical categories while preserving it separately.
+         */
+        delete existingStatsObject._imported_game_ids;
+
+        const record: PlayerRecord = {
+          playerId: player.id,
+          cfbdPlayerId:
+            player.cfbd_player_id,
+          name: player.name,
+          position: player.position,
+          games: new Set<number>(),
+          stats: existingStatsObject,
+        };
+
+        /*
+         * We don't know the exact individual game appearances
+         * from older records, but the existing games field still
+         * represents the previously accumulated game count.
+         */
+        const existingGames =
+          Number(row.games) || 0;
+
+        for (let i = 0; i < existingGames; i++) {
+          record.games.add(
+            -(i + 1)
+          );
+        }
+
+        existingByPlayer.set(
+          player.id,
+          record
+        );
+      }
+
+      /*
+       * ---------------------------------------------------------
+       * 5. Download player stats ONLY for new games.
+       *
+       * This is where the quota savings happen.
+       * ---------------------------------------------------------
+       */
+      for (const game of newGames) {
+        console.log(
+          `Importing new game ${game.id}: ${game.homeTeam} vs ${game.awayTeam}`
+        );
+
+        const gamePlayers =
+          await cfbdFetch<CFBDPlayerStats[]>(
+            '/games/players',
+            cfbdApiKey,
+            {
+              year: String(season),
+              gameId: String(game.id),
+            }
+          );
 
         if (!Array.isArray(gamePlayers)) {
           continue;
@@ -253,12 +401,18 @@ export async function GET(request: Request) {
 
           let player: PlayerRow | undefined;
 
+          /*
+           * Match by CFBD player ID first.
+           */
           if (athlete.id !== undefined) {
             player = playersByCfbdId.get(
               String(athlete.id)
             );
           }
 
+          /*
+           * Fall back to name matching.
+           */
           if (!player) {
             player = playersByName.get(
               normalizeName(athlete.name)
@@ -266,13 +420,14 @@ export async function GET(request: Request) {
           }
 
           /*
-           * Ignore players who aren't on our Penn State roster.
+           * Ignore players who aren't on our roster.
            */
           if (!player) {
             continue;
           }
 
-          let record = playerRecords.get(player.id);
+          let record =
+            existingByPlayer.get(player.id);
 
           if (!record) {
             record = {
@@ -288,64 +443,111 @@ export async function GET(request: Request) {
               stats: {},
             };
 
-            playerRecords.set(player.id, record);
+            existingByPlayer.set(
+              player.id,
+              record
+            );
           }
 
           /*
-           * If the player appeared in this game's player stats,
-           * count the game as played.
+           * Mark this game as played for this player.
            */
           record.games.add(game.id);
 
-          for (const category of athlete.categories || []) {
-            if (!category?.category) continue;
+          /*
+           * Add this game's stats to the season totals.
+           */
+          for (const category of
+            athlete.categories || []) {
+            if (!category?.category) {
+              continue;
+            }
 
             if (!record.stats[category.category]) {
               record.stats[category.category] = {};
             }
 
-            for (const statType of category.types || []) {
-              if (!statType?.type) continue;
-
-              const value = parseStatValue(statType.stat);
-
-              if (!record.stats[category.category][statType.type]) {
-                record.stats[category.category][statType.type] = 0;
+            for (const statType of
+              category.types || []) {
+              if (!statType?.type) {
+                continue;
               }
 
-              record.stats[category.category][statType.type] += value;
+              const value =
+                parseStatValue(
+                  statType.stat
+                );
+
+              if (
+                !record.stats[
+                  category.category
+                ][statType.type]
+              ) {
+                record.stats[
+                  category.category
+                ][statType.type] = 0;
+              }
+
+              record.stats[
+                category.category
+              ][statType.type] += value;
             }
           }
         }
       }
 
       /*
-       * 4. Build Supabase rows.
+       * ---------------------------------------------------------
+       * 6. Build updated Supabase rows.
+       * ---------------------------------------------------------
        */
-      const rows = Array.from(playerRecords.values()).map(
-        (record) => ({
+      const rows = Array.from(
+        existingByPlayer.values()
+      ).map((record) => {
+        const cleanStats = {
+          ...record.stats,
+          _imported_game_ids:
+            Array.from(
+              new Set([
+                ...importedGameIds,
+                ...newGames.map(
+                  (game) => game.id
+                ),
+              ])
+            ).sort(
+              (a, b) => a - b
+            ),
+        };
+
+        return {
           player_id: record.playerId,
-          cfbd_player_id: record.cfbdPlayerId,
+          cfbd_player_id:
+            record.cfbdPlayerId,
           season,
           team: TEAM,
           position: record.position,
           games: record.games.size,
-          stats: record.stats,
-          updated_at: new Date().toISOString(),
-        })
-      );
+          stats: cleanStats,
+          updated_at:
+            new Date().toISOString(),
+        };
+      });
 
       /*
-       * 5. Upsert current-season totals.
+       * ---------------------------------------------------------
+       * 7. Upsert totals.
        *
        * This does NOT delete historical stats.
+       * ---------------------------------------------------------
        */
       if (rows.length > 0) {
-        const { error: upsertError } = await supabase
-          .from('player_season_stats')
-          .upsert(rows, {
-            onConflict: 'player_id,season',
-          });
+        const { error: upsertError } =
+          await supabase
+            .from('player_season_stats')
+            .upsert(rows, {
+              onConflict:
+                'player_id,season',
+            });
 
         if (upsertError) {
           throw new Error(
@@ -356,23 +558,31 @@ export async function GET(request: Request) {
 
       results.push({
         season,
-        games: completedGames.length,
+        completedGames:
+          completedGames.length,
+        previouslyImportedGames:
+          importedGameIds.size,
+        newGames: newGames.length,
         players: rows.length,
         status: 'success',
       });
 
       console.log(
-        `Finished ${season}: ${rows.length} players updated`
+        `Finished ${season}: ${newGames.length} new games imported, ${rows.length} player totals updated`
       );
     }
 
     return NextResponse.json({
       success: true,
-      timestamp: new Date().toISOString(),
+      timestamp:
+        new Date().toISOString(),
       results,
     });
   } catch (error) {
-    console.error('Player stats import failed:', error);
+    console.error(
+      'Player stats import failed:',
+      error
+    );
 
     return NextResponse.json(
       {
