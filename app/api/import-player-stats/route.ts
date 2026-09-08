@@ -106,9 +106,6 @@ async function cfbdFetch<T>(
 
 export async function GET(request: Request) {
   try {
-    /*
-     * Protect the endpoint when CRON_SECRET is configured.
-     */
     const cronSecret = process.env.CRON_SECRET;
 
     if (cronSecret) {
@@ -151,13 +148,7 @@ export async function GET(request: Request) {
         `Starting ${season} player stats import...`
       );
 
-      /*
-       * ---------------------------------------------------------
-       * 1. Get Penn State's games.
-       *
-       * This is one CFBD call.
-       * ---------------------------------------------------------
-       */
+      // Get Penn State games for the season.
       const games = await cfbdFetch<CFBDGame[]>(
         '/games',
         cfbdApiKey,
@@ -191,11 +182,7 @@ export async function GET(request: Request) {
         continue;
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 2. Load Penn State roster.
-       * ---------------------------------------------------------
-       */
+      // Load Penn State roster.
       const {
         data: players,
         error: playersError,
@@ -234,14 +221,7 @@ export async function GET(request: Request) {
         );
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 3. Load existing 2026 stats.
-       *
-       * We use _imported_game_ids to know which games have
-       * already been processed.
-       * ---------------------------------------------------------
-       */
+      // Load existing season stats.
       const {
         data: existingStats,
         error: existingStatsError,
@@ -262,9 +242,7 @@ export async function GET(request: Request) {
       const existingRows =
         (existingStats || []) as ExistingStatsRow[];
 
-      /*
-       * Find all games previously imported.
-       */
+      // Determine which games have already been imported.
       const importedGameIds =
         new Set<number>();
 
@@ -293,9 +271,6 @@ export async function GET(request: Request) {
         }
       }
 
-      /*
-       * Only process games that haven't already been imported.
-       */
       const newGames =
         completedGames.filter(
           (game) =>
@@ -310,11 +285,7 @@ export async function GET(request: Request) {
         `New games to import: ${newGames.length}`
       );
 
-      /*
-       * ---------------------------------------------------------
-       * 4. Nothing new to import.
-       * ---------------------------------------------------------
-       */
+      // Nothing new to import.
       if (newGames.length === 0) {
         results.push({
           season,
@@ -330,11 +301,7 @@ export async function GET(request: Request) {
         continue;
       }
 
-      /*
-       * ---------------------------------------------------------
-       * 5. Build existing player totals.
-       * ---------------------------------------------------------
-       */
+      // Build existing player totals.
       const playerRecords =
         new Map<number, PlayerRecord>();
 
@@ -352,9 +319,6 @@ export async function GET(request: Request) {
             ? { ...row.stats }
             : {};
 
-        /*
-         * Internal tracking field isn't an actual stat.
-         */
         delete existingStatsObject
           ._imported_game_ids;
 
@@ -368,12 +332,6 @@ export async function GET(request: Request) {
           stats: existingStatsObject,
         };
 
-        /*
-         * Preserve the existing games count.
-         *
-         * We use negative placeholder IDs because the exact
-         * previous game IDs aren't known for older imports.
-         */
         const existingGames =
           Number(row.games) || 0;
 
@@ -394,11 +352,7 @@ export async function GET(request: Request) {
       }
 
       /*
-       * ---------------------------------------------------------
-       * 6. Fetch player stats ONLY for new games.
-       *
-       * This is the part that protects your 1,000-call quota.
-       * ---------------------------------------------------------
+       * Fetch player stats ONLY for games we haven't imported.
        */
       for (const game of newGames) {
         console.log(
@@ -428,9 +382,7 @@ export async function GET(request: Request) {
             | PlayerRow
             | undefined;
 
-          /*
-           * Match by CFBD ID first.
-           */
+          // Match by CFBD ID first.
           if (
             athlete.id !== undefined
           ) {
@@ -440,9 +392,7 @@ export async function GET(request: Request) {
               );
           }
 
-          /*
-           * Fall back to name matching.
-           */
+          // Fall back to name.
           if (!player) {
             player =
               playersByName.get(
@@ -452,9 +402,6 @@ export async function GET(request: Request) {
               );
           }
 
-          /*
-           * Ignore players who aren't on our roster.
-           */
           if (!player) {
             continue;
           }
@@ -484,16 +431,10 @@ export async function GET(request: Request) {
             );
           }
 
-          /*
-           * Count this new game for the player.
-           */
           record.games.add(
             game.id
           );
 
-          /*
-           * Add game stats to season totals.
-           */
           for (
             const category of
             athlete.categories || []
@@ -549,22 +490,36 @@ export async function GET(request: Request) {
       }
 
       /*
-       * ---------------------------------------------------------
-       * 7. Save updated player totals.
-       * ---------------------------------------------------------
+       * Build the complete list of imported game IDs.
+       *
+       * IMPORTANT:
+       * Do not use the spread operator on Set because the
+       * project's TypeScript target does not support it.
        */
       const allImportedGameIds =
         Array.from(
-          new Set([
-            ...importedGameIds,
-            ...newGames.map(
-              (game) => game.id
-            ),
-          ])
-        ).sort(
-          (a, b) => a - b
+          importedGameIds
         );
 
+      for (const game of newGames) {
+        if (
+          !allImportedGameIds.includes(
+            game.id
+          )
+        ) {
+          allImportedGameIds.push(
+            game.id
+          );
+        }
+      }
+
+      allImportedGameIds.sort(
+        (a, b) => a - b
+      );
+
+      /*
+       * Build Supabase rows.
+       */
       const rows =
         Array.from(
           playerRecords.values()
@@ -597,9 +552,7 @@ export async function GET(request: Request) {
         }));
 
       /*
-       * Upsert the totals.
-       *
-       * This does NOT delete historical stats.
+       * Upsert player totals.
        */
       if (rows.length > 0) {
         const {
