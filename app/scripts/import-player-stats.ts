@@ -30,7 +30,7 @@ const TEAM = 'Penn State';
 // Completed seasons only.
 // The newer historical importer in /api/import-stats
 // is responsible for the broader historical data.
-const SEASONS = [2024, 2025];
+const SEASONS = [2026];
 
 interface CFBDStat {
   name: string;

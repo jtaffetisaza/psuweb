@@ -12,7 +12,7 @@ const CFBD_API_KEY = process.env.CFBD_API_KEY;
 const CFBD_BASE =
   "https://api.collegefootballdata.com";
 
-const SEASONS = [2025, 2024, 2023, 2022, 2021];
+const SEASONS = [2026, 2025, 2024, 2023, 2022, 2021];
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1200;
