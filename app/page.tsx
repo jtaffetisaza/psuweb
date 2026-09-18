@@ -116,6 +116,8 @@ const SPECIAL_TEAMS_SLOTS: DepthSlot[] = [
   { id: 'K', label: 'K', eligiblePositions: ['K'] },
   { id: 'P', label: 'P', eligiblePositions: ['P'] },
   { id: 'LS', label: 'LS', eligiblePositions: ['LS'] },
+  { id: 'KR', label: 'KR', eligiblePositions: ['WR', 'RB', 'CB', 'S'] },
+  { id: 'PR', label: 'PR', eligiblePositions: ['WR', 'RB', 'CB', 'S'] },
 ];
 
 const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
@@ -133,6 +135,8 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Quinton Martin Jr.',
     'Cam Wallace',
     "D'Antae Sheffey",
+    "Amar'e Glover",    
+    'Jeremy Washington',
   ],
 
   X: [
@@ -154,6 +158,7 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Amarion Jackson',
     'Lyrick Samuel',
     'Logan Cunningham',
+    'Hank Lustig',
   ],
 
   TE: [
@@ -164,6 +169,7 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Cooper Alexander',
     'Brian Kortovich',
     'Finn Furmanek',
+    'Jake Lukac'
   ],
 
   OT: [
@@ -171,6 +177,7 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Owen Aliciene',
     'Mason Bandhauer',
     'Hunter Albright',
+    'Pete Eglitis',
   ],
 
   G1: [
@@ -206,6 +213,7 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Jackson Ford',
     'Dayshaun Burnett',
     'Bobby Mears',
+    'Elijah Reeder',
   ],
 
   DT1: [
@@ -225,18 +233,20 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
 
   DE2: [
     'Ikenna Ezeogu',
-    'Max Granville',
+    'Caleb Bacon',
     'Alexander McPherson',
     'Mason Robinson',
     'Aidan Probst',
     'Jordan Mayer',
+    'Max Granville',
   ],
 
   ILB: [
     'Kooper Ebel',
     'Cael Brezina',
     'Chris Fileppo',
-    'Caleb Bacon',
+    'Keian Kaiser', 
+    'Josh Banks',
   ],
 
   OLB: [
@@ -244,6 +254,7 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Cam Smith',
     'Alex Tatsch',
     'John Klosterman',
+    'Evan Wolff',
   ],
 
   CB: [
@@ -277,6 +288,7 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Jeremiah Cooper',
     'Vaboue Toure',
     'Omarion Davis',
+    'Jake Laverde',
   ],
 
   K: [
@@ -287,11 +299,24 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
 
   P: [
     'Nathan Tiyce',
+    'Lucas Tenbrock',
   ],
 
   LS: [
     'Blaise Sokach-Minnick',
     'Andrew Dufault',
+  ],
+
+  KR: [
+    'Zay Robinson',
+    'Zion Tracy',
+    'Quinton Martin Jr.',
+  ],
+
+  PR: [
+    'Zay Robinson',
+    'Zion Tracy',
+    'Koby Howard',
   ],
 };
 
