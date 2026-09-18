@@ -11,6 +11,8 @@ interface Player {
   position: string;
   eligibility: string;
   depth_rank: number;
+  status?: string;
+  injury_note?: string;
 }
 
 const UNITS = {
@@ -21,27 +23,37 @@ const UNITS = {
 
 export default function DepthChartPage() {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [activeUnit, setActiveUnit] = useState<'OFFENSE' | 'DEFENSE' | 'SPECIAL_TEAMS'>('OFFENSE');
+  const [activeUnit, setActiveUnit] = useState<'OFFENSE' | 'DEFENSE' | 'SPECIAL_TEAMS'>('DEFENSE');
 
   useEffect(() => {
     fetchPlayers();
   }, []);
 
   async function fetchPlayers() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('players')
-      .select('id, number, name, position, eligibility, depth_rank')
+      .select('id, number, name, position, eligibility, depth_rank, status, injury_note')
       .order('depth_rank', { ascending: true })
       .order('number', { ascending: true });
+
+    if (error) {
+      console.error('Supabase fetch error:', error);
+      return;
+    }
 
     setPlayers(data || []);
   }
 
   const activePositions = UNITS[activeUnit];
-  const unitPlayers = players.filter(p => activePositions.includes(p.position));
+
+  const unitPlayers = players.filter(p => {
+    if (!p.position) return false;
+    const pos = p.position.toUpperCase();
+    return activePositions.some(ap => pos.includes(ap));
+  });
 
   const groupedByPosition = activePositions.reduce((acc, pos) => {
-    const posPlayers = unitPlayers.filter(p => p.position === pos);
+    const posPlayers = unitPlayers.filter(p => p.position && p.position.toUpperCase().includes(pos));
     if (posPlayers.length > 0) acc[pos] = posPlayers;
     return acc;
   }, {} as Record<string, Player[]>);
@@ -80,20 +92,40 @@ export default function DepthChartPage() {
                 <span className="text-xs text-slate-500 font-medium">{posPlayers.length} Players</span>
               </div>
               <ul className="divide-y divide-slate-700/50">
-                {posPlayers.map((player) => (
-                  <li key={player.id} className="p-3 px-4 flex items-center justify-between hover:bg-slate-700/30 transition">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded font-mono">
-                        #{player.depth_rank || '-'}
-                      </span>
-                      <Link href={`/player/${player.id}`} className="font-semibold text-white hover:text-blue-400">
-                        {player.name}
-                      </Link>
-                      <span className="text-xs text-slate-400">#{player.number}</span>
-                    </div>
-                    <span className="text-xs text-slate-500">{player.eligibility}</span>
-                  </li>
-                ))}
+                {posPlayers.map((player) => {
+                  const isIR = String(player.status || '').trim().toUpperCase() === 'IR_OUT';
+
+                  return (
+                    <li
+                      key={player.id}
+                      className={`p-3 px-4 flex items-center justify-between hover:bg-slate-700/30 transition ${
+                        isIR ? 'bg-red-950/40 border-l-4 border-l-red-500' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-xs font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded font-mono">
+                          #{player.depth_rank || '-'}
+                        </span>
+                        <Link
+                          href={`/player/${player.id}`}
+                          className={`font-semibold hover:text-blue-400 ${
+                            isIR ? 'text-red-300 line-through' : 'text-white'
+                          }`}
+                        >
+                          {player.name}
+                        </Link>
+                        <span className="text-xs text-slate-400">#{player.number}</span>
+
+                        {isIR && (
+                          <span className="text-[10px] font-bold uppercase bg-red-900 text-red-100 border border-red-500 px-2 py-0.5 rounded-full">
+                            IR - Out
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-500">{player.eligibility}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))

@@ -25,6 +25,8 @@ interface Player {
   recruiting_team: string | null;
   scouting_tag: string | null;
   scouting_note: string | null;
+  status?: string;
+  injury_note?: string;
 }
 
 interface StaffMember {
@@ -368,7 +370,7 @@ export default function RosterDashboard() {
   async function fetchPlayers() {
     const { data, error } = await supabase
       .from('players')
-      .select('*')
+      .select('*, status, injury_note')
       .order('position', { ascending: true })
       .order('number', { ascending: true });
 
@@ -830,10 +832,16 @@ export default function RosterDashboard() {
         ? 'p-3'
         : 'p-4';
 
+    const isIR = String(player.status || '').trim().toUpperCase() === 'IR_OUT';
+
     return (
       <div
         key={player.id}
-        className={`rounded-xl border border-white/10 bg-slate-900/90 ${cardPadding}`}
+        className={`rounded-xl border transition ${cardPadding} ${
+          isIR
+            ? 'border-red-800/80 bg-red-950/40 border-l-4 border-l-red-500'
+            : 'border-white/10 bg-slate-900/90'
+        }`}
       >
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 font-mono text-sm font-bold text-blue-300">
@@ -841,12 +849,22 @@ export default function RosterDashboard() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <Link
-              href={`/player/${player.id}`}
-              className="block truncate font-semibold text-white transition hover:text-blue-400 hover:underline"
-            >
-              {player.name}
-            </Link>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href={`/player/${player.id}`}
+                className={`block truncate font-semibold transition hover:text-blue-400 hover:underline ${
+                  isIR ? 'text-red-300 line-through' : 'text-white'
+                }`}
+              >
+                {player.name}
+              </Link>
+
+              {isIR && (
+                <span className="rounded-full bg-red-900 border border-red-500/60 px-2 py-0.5 text-[10px] font-bold text-red-100 uppercase tracking-wide">
+                  IR - Out
+                </span>
+              )}
+            </div>
 
             <div className="mt-0.5 text-xs text-slate-500">
               {player.position}
