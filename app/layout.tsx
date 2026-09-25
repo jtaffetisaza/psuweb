@@ -6,6 +6,18 @@ export const metadata: Metadata = {
   title: 'Penn State Football Dashboard',
   description: 'Team Management Dashboard',
 };
+import { Analytics } from "@vercel/analytics/next";
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <Analytics />
+      </body>
+    </html>
+  );
+}
 
 export default function RootLayout({
   children,
