@@ -1,36 +1,28 @@
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-interface Matchup {
+interface Game {
   id: number;
   season: number;
-  week: number | null;
   opponent: string;
-  date: string | null;
+  date: string;
   time: string | null;
   location: string | null;
   venue: string | null;
+  note: string | null;
   is_home: boolean;
-  conference: string | null;
-  game_type: string | null;
-  penn_state_record: string | null;
-  opponent_record: string | null;
-  penn_state_ranking: number | null;
-  opponent_ranking: number | null;
   preview: string | null;
   offense_breakdown: string | null;
   defense_breakdown: string | null;
   key_matchup: string | null;
   key_storylines: string | null;
   prediction: string | null;
-  penn_state_score: number | null;
-  opponent_score: number | null;
-  result: string | null;
-  note: string | null;
+  conference: string | null;
+  game_type: string | null;
 }
 
 interface MatchupPlayer {
@@ -38,909 +30,287 @@ interface MatchupPlayer {
   matchup_id: number;
   player_id: number | null;
   team_name: string;
-  player_name: string;
-  position: string | null;
-  role: string | null;
-  stats: Record<string, unknown> | null;
-  note: string | null;
-  sort_order: number;
+  role_note: string | null;
+  players?: {
+    id: number;
+    name: string;
+    position: string;
+    number: number;
+  };
 }
 
-interface MatchupTeamStats {
-  id: number;
-  matchup_id: number;
-  team_name: string;
-  points_per_game: number | null;
-  total_yards_per_game: number | null;
-  passing_yards_per_game: number | null;
-  rushing_yards_per_game: number | null;
-  points_allowed_per_game: number | null;
-  turnovers: number | null;
-  sacks: number | null;
-  third_down_pct: number | null;
-  red_zone_pct: number | null;
+// Converts "2026-09-19" to "Sat, Sep 19, 2026"
+function formatDate(dateString?: string) {
+  if (!dateString) return 'TBD';
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const dateObj = new Date(year, month, day);
+    if (!isNaN(dateObj.getTime())) {
+      return dateObj.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    }
+  }
+  return dateString;
 }
 
-interface MatchupHistory {
-  id: number;
-  matchup_id: number;
-  season: number;
-  opponent: string;
-  penn_state_score: number | null;
-  opponent_score: number | null;
-  location: string | null;
-  venue: string | null;
-  result: string | null;
-  note: string | null;
+// Converts "12:00" or "15:30" to "12:00 PM" / "3:30 PM"
+function formatTime(timeString?: string | null) {
+  if (!timeString) return 'TBD';
+  const timeParts = timeString.split(':');
+  if (timeParts.length >= 2) {
+    let hours = parseInt(timeParts[0], 10);
+    const minutes = timeParts[1];
+    if (isNaN(hours)) return timeString;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    return `${hours}:${minutes} ${ampm}`;
+  }
+  return timeString;
 }
 
-interface MatchupSeries {
-  id: number;
-  opponent: string;
-  penn_state_wins: number;
-  opponent_wins: number;
-  ties: number;
-  total_games: number;
-}
+export default function MatchupPage() {
+  const params = useParams();
+  const matchupId = params?.id;
 
-export default async function MatchupPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const matchupId = Number(id);
+  const [game, setGame] = useState<Game | null>(null);
+  const [keyPlayers, setKeyPlayers] = useState<MatchupPlayer[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (Number.isNaN(matchupId)) {
-    notFound();
+  useEffect(() => {
+    if (!matchupId) return;
+
+    async function fetchMatchupData() {
+      try {
+        setLoading(true);
+
+        const { data: gameData, error: gameError } = await supabase
+          .from('matchups')
+          .select('*')
+          .eq('id', matchupId)
+          .single();
+
+        if (gameError) throw gameError;
+        setGame(gameData as Game);
+
+        const { data: playerData } = await supabase
+          .from('matchup_key_players')
+          .select('*, players(id, name, position, number)')
+          .eq('matchup_id', matchupId);
+
+        setKeyPlayers((playerData || []) as MatchupPlayer[]);
+      } catch (err) {
+        console.error('Error fetching matchup details:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchMatchupData();
+  }, [matchupId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-8 font-sans text-slate-500 font-semibold">
+        Loading matchup details...
+      </div>
+    );
   }
 
-  const { data: matchupData, error: matchupError } = await supabase
-    .from('matchups')
-    .select('*')
-    .eq('id', matchupId)
-    .single();
-
-  if (matchupError || !matchupData) {
-    console.error('MATCHUP ERROR:', matchupError);
-    notFound();
+  if (!game) {
+    return (
+      <div className="min-h-screen bg-slate-50 p-8 font-sans text-slate-900">
+        <Link
+          href="/?tab=schedule"
+          className="text-xs font-bold uppercase tracking-wider text-blue-900 hover:underline"
+        >
+          ← Back to Schedule
+        </Link>
+        <p className="mt-4 text-slate-500">Matchup not found.</p>
+      </div>
+    );
   }
 
-  const game = matchupData as Matchup;
-
-  const [
-    { data: playerData },
-    { data: teamStatsData },
-    { data: historyData },
-    { data: seriesData },
-  ] = await Promise.all([
-    supabase
-      .from('matchup_players')
-      .select('*')
-      .eq('matchup_id', matchupId)
-      .order('sort_order', { ascending: true }),
-
-    supabase
-      .from('matchup_team_stats')
-      .select('*')
-      .eq('matchup_id', matchupId),
-
-    supabase
-      .from('matchup_history')
-      .select('*')
-      .eq('opponent', game.opponent)
-      .order('season', { ascending: false }),
-
-    supabase
-      .from('matchup_series')
-      .select('*')
-      .eq('opponent', game.opponent)
-      .single(),
-  ]);
-
-  const matchupPlayers = (playerData || []) as MatchupPlayer[];
-  const teamStats = (teamStatsData || []) as MatchupTeamStats[];
-  const matchupHistory = (historyData || []) as MatchupHistory[];
-  const series = seriesData as MatchupSeries | null;
-
-  const pennStatePlayers = matchupPlayers.filter(
-    (player) => player.team_name === 'Penn State'
+  const psuKeyPlayers = keyPlayers.filter(
+    (kp) => kp.team_name?.toLowerCase() === 'penn state'
   );
-
-  const opponentPlayers = matchupPlayers.filter(
-    (player) => player.team_name !== 'Penn State'
+  const oppKeyPlayers = keyPlayers.filter(
+    (kp) => kp.team_name?.toLowerCase() !== 'penn state'
   );
-
-  const pennStateStats = teamStats.find(
-    (team) => team.team_name === 'Penn State'
-  );
-
-  const opponentStats = teamStats.find(
-    (team) => team.team_name === game.opponent
-  );
-
-  const recentWins = matchupHistory.filter(
-    (history) => history.result === 'W'
-  ).length;
-
-  const recentLosses = matchupHistory.filter(
-    (history) => history.result === 'L'
-  ).length;
-
-  const recentTies = matchupHistory.filter(
-    (history) =>
-      history.result === 'T' ||
-      history.result === 'D'
-  ).length;
-
-  const seriesRecordText = series
-    ? `${series.penn_state_wins}-${series.opponent_wins}${
-        series.ties > 0 ? `-${series.ties}` : ''
-      }`
-    : '—';
-
-  const recentRecordText =
-    matchupHistory.length > 0
-      ? `${recentWins}-${recentLosses}${
-          recentTies > 0 ? `-${recentTies}` : ''
-        }`
-      : '—';
-
-  const formattedDate = game.date
-    ? new Date(`${game.date}T12:00:00`).toLocaleDateString(
-        'en-US',
-        {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric',
-        }
-      )
-    : 'Date TBD';
-
-  const formattedTime = game.time
-    ? game.time.slice(0, 5)
-    : 'Time TBD';
 
   return (
-    <main className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
-      <div className="mx-auto max-w-7xl space-y-6">
-
-        <Link
-          href="/"
-          className="inline-flex items-center text-sm font-medium text-blue-400 transition hover:text-blue-300"
-        >
-          ← Back to Dashboard
-        </Link>
-
-        {/* GAME HEADER */}
-        <section className="glass-panel overflow-hidden rounded-3xl">
-
-          <div className="border-b border-white/10 bg-gradient-to-r from-blue-950/70 via-slate-950 to-blue-950/40 p-6 sm:p-8">
-
-            <div className="mb-6 flex flex-wrap items-center gap-2">
-
-              <span className="rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-300">
-                {game.game_type || 'Regular Season'}
-              </span>
-
-              {game.conference && (
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  {game.conference}
-                </span>
-              )}
-
-            </div>
-
-            <div className="grid gap-8 md:grid-cols-[1fr_auto_1fr] md:items-center">
-
-              <div className="text-center md:text-left">
-
-                {game.penn_state_ranking && (
-                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-400">
-                    #{game.penn_state_ranking}
-                  </div>
-                )}
-
-                <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">
-                  Penn State
-                </h1>
-
-                {game.penn_state_record && (
-                  <p className="mt-2 text-sm text-slate-400">
-                    {game.penn_state_record}
-                  </p>
-                )}
-
-              </div>
-
-              <div className="text-center">
-                <div className="text-sm font-bold uppercase tracking-[0.3em] text-slate-600">
-                  VS
-                </div>
-              </div>
-
-              <div className="text-center md:text-right">
-
-                {game.opponent_ranking && (
-                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-blue-400">
-                    #{game.opponent_ranking}
-                  </div>
-                )}
-
-                <h2 className="text-4xl font-black tracking-tight text-white sm:text-5xl">
-                  {game.opponent}
-                </h2>
-
-                {game.opponent_record && (
-                  <p className="mt-2 text-sm text-slate-400">
-                    {game.opponent_record}
-                  </p>
-                )}
-
-              </div>
-
-            </div>
-
-          </div>
-
-          <div className="grid grid-cols-1 divide-y divide-white/10 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-
-            <div className="p-5 text-center">
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Date
-              </div>
-
-              <div className="mt-1 font-semibold text-white">
-                {formattedDate}
-              </div>
-            </div>
-
-            <div className="p-5 text-center">
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Kickoff
-              </div>
-
-              <div className="mt-1 font-semibold text-white">
-                {formattedTime}
-              </div>
-            </div>
-
-            <div className="p-5 text-center">
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Location
-              </div>
-
-              <div className="mt-1 font-semibold text-white">
-                {game.location || 'TBD'}
-              </div>
-
-              {game.venue && (
-                <div className="mt-1 text-xs text-slate-500">
-                  {game.venue}
-                </div>
-              )}
-            </div>
-
-          </div>
-
-        </section>
-
-        {/* MATCHUP PREVIEW */}
-        <section className="glass-panel rounded-2xl p-6">
-
-          <div className="mb-4">
-            <div className="text-xs font-bold uppercase tracking-wider text-blue-400">
-              Matchup Preview
-            </div>
-
-            <h2 className="mt-1 text-2xl font-bold text-white">
-              Penn State vs. {game.opponent}
-            </h2>
-          </div>
-
-          <p className="whitespace-pre-line leading-7 text-slate-300">
-            {game.preview ||
-              'Matchup analysis has not been added yet.'}
-          </p>
-
-        </section>
-
-        {/* KEY PLAYERS */}
-        <section className="glass-panel rounded-2xl p-6">
-
-          <div className="mb-6">
-            <div className="text-xs font-bold uppercase tracking-wider text-blue-400">
-              Key Players
-            </div>
-
-            <h2 className="mt-1 text-2xl font-bold text-white">
-              Players to Watch
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-            {/* PENN STATE */}
-            <div>
-
-              <div className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">
-                Penn State
-              </div>
-
-              <div className="space-y-3">
-
-                {pennStatePlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="rounded-xl border border-white/10 bg-slate-950/40 p-4"
-                  >
-
-                    <div className="flex items-start justify-between gap-4">
-
-                      <div>
-                        <h3 className="font-bold text-white">
-                          {player.player_name}
-                        </h3>
-
-                        <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-blue-400">
-                          {player.position || 'Player'}
-                          {player.role ? ` • ${player.role}` : ''}
-                        </div>
-                      </div>
-
-                      {player.player_id && (
-                        <Link
-                          href={`/player/${player.player_id}`}
-                          className="text-xs font-medium text-slate-500 transition hover:text-blue-400"
-                        >
-                          Profile →
-                        </Link>
-                      )}
-
-                    </div>
-
-                    {player.note && (
-                      <p className="mt-3 text-sm leading-6 text-slate-400">
-                        {player.note}
-                      </p>
-                    )}
-
-                  </div>
-                ))}
-
-                {pennStatePlayers.length === 0 && (
-                  <p className="text-sm text-slate-500">
-                    No Penn State players added yet.
-                  </p>
-                )}
-
-              </div>
-
-            </div>
-
-            {/* OPPONENT */}
-            <div>
-
-              <div className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">
-                {game.opponent}
-              </div>
-
-              <div className="space-y-3">
-
-                {opponentPlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="rounded-xl border border-white/10 bg-slate-950/40 p-4"
-                  >
-
-                    <div>
-                      <h3 className="font-bold text-white">
-                        {player.player_name}
-                      </h3>
-
-                      <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-blue-400">
-                        {player.position || 'Player'}
-                        {player.role ? ` • ${player.role}` : ''}
-                      </div>
-                    </div>
-
-                    {player.note && (
-                      <p className="mt-3 text-sm leading-6 text-slate-400">
-                        {player.note}
-                      </p>
-                    )}
-
-                  </div>
-                ))}
-
-                {opponentPlayers.length === 0 && (
-                  <p className="text-sm text-slate-500">
-                    No opponent players added yet.
-                  </p>
-                )}
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        {/* TEAM COMPARISON */}
-        <section className="glass-panel overflow-hidden rounded-2xl">
-
-          <div className="border-b border-white/10 p-6">
-
-            <div className="text-xs font-bold uppercase tracking-wider text-blue-400">
-              Team Comparison
-            </div>
-
-            <h2 className="mt-1 text-2xl font-bold text-white">
-              By the Numbers
-            </h2>
-
-          </div>
-
-          {pennStateStats || opponentStats ? (
-            <div className="overflow-x-auto">
-
-              <table className="w-full min-w-[600px] border-collapse">
-
-                <thead>
-                  <tr className="border-b border-white/10 bg-slate-950/40">
-
-                    <th className="p-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Category
-                    </th>
-
-                    <th className="p-4 text-center text-xs font-semibold uppercase tracking-wider text-blue-400">
-                      Penn State
-                    </th>
-
-                    <th className="p-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
-                      {game.opponent}
-                    </th>
-
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-white/5">
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm font-medium text-slate-300">
-                      Record
-                    </td>
-
-                    <td className="p-4 text-center font-bold text-white">
-                      {game.penn_state_record || '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-bold text-white">
-                      {game.opponent_record || '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Points / Game
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.points_per_game ?? '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.points_per_game ?? '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Total Yards / Game
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.total_yards_per_game ?? '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.total_yards_per_game ?? '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Passing Yards / Game
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.passing_yards_per_game ?? '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.passing_yards_per_game ?? '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Rushing Yards / Game
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.rushing_yards_per_game ?? '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.rushing_yards_per_game ?? '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Points Allowed / Game
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.points_allowed_per_game ?? '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.points_allowed_per_game ?? '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Turnovers
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.turnovers ?? '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.turnovers ?? '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Sacks
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.sacks ?? '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.sacks ?? '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      3rd Down %
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.third_down_pct != null
-                        ? `${pennStateStats.third_down_pct}%`
-                        : '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.third_down_pct != null
-                        ? `${opponentStats.third_down_pct}%`
-                        : '—'}
-                    </td>
-                  </tr>
-
-                  <tr className="hover:bg-white/[0.02]">
-                    <td className="p-4 text-sm text-slate-400">
-                      Red Zone %
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {pennStateStats?.red_zone_pct != null
-                        ? `${pennStateStats.red_zone_pct}%`
-                        : '—'}
-                    </td>
-
-                    <td className="p-4 text-center font-semibold text-white">
-                      {opponentStats?.red_zone_pct != null
-                        ? `${opponentStats.red_zone_pct}%`
-                        : '—'}
-                    </td>
-                  </tr>
-
-                </tbody>
-
-              </table>
-
-            </div>
-          ) : (
-            <div className="p-8 text-center">
-
-              <div className="text-sm font-semibold text-slate-300">
-                No season statistics yet
-              </div>
-
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-                Team statistics will appear here automatically after Penn State plays its first game of the season.
-              </p>
-
-            </div>
-          )}
-
-        </section>
-
-        {/* MATCHUP HISTORY */}
-        <section className="glass-panel overflow-hidden rounded-2xl">
-
-          <div className="border-b border-white/10 p-6 sm:p-7">
-
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-blue-400">
-                  Matchup History
-                </div>
-
-                <h2 className="mt-1 text-2xl font-bold text-white">
-                  Penn State vs. {game.opponent}
-                </h2>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  All-time series and recent meetings
-                </p>
-              </div>
-
-              <div className="flex items-center gap-8 rounded-xl border border-white/10 bg-slate-950/40 px-6 py-4">
-
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Series Record
-                  </div>
-
-                  <div className="mt-1 text-2xl font-black text-white">
-                    {seriesRecordText}
-                  </div>
-
-                  <div className="mt-1 text-xs text-slate-500">
-                    Penn State
-                  </div>
-                </div>
-
-                <div className="h-10 w-px bg-white/10" />
-
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Recent
-                  </div>
-
-                  <div className="mt-1 text-2xl font-black text-white">
-                    {recentRecordText}
-                  </div>
-
-                  <div className="mt-1 text-xs text-slate-500">
-                    Meetings shown
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-
-          {matchupHistory.length > 0 ? (
-            <div className="divide-y divide-white/10">
-
-              {matchupHistory.map((history) => (
-                <div
-                  key={history.id}
-                  className="p-5 transition hover:bg-white/[0.02] sm:p-6"
-                >
-
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-
-                    <div className="flex items-center gap-4">
-
-                      <div
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-sm font-black ${
-                          history.result === 'W'
-                            ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-400'
-                            : history.result === 'L'
-                              ? 'border-red-400/20 bg-red-400/10 text-red-400'
-                              : 'border-white/10 bg-white/[0.04] text-slate-400'
-                        }`}
-                      >
-                        {history.result || '—'}
-                      </div>
-
-                      <div>
-
-                        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          {history.season} Season
-                        </div>
-
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-
-                          <span className="font-bold text-white">
-                            Penn State
-                          </span>
-
-                          <span className="text-xl font-black text-white">
-                            {history.penn_state_score ?? '—'}
-                          </span>
-
-                          <span className="text-slate-600">
-                            –
-                          </span>
-
-                          <span className="text-xl font-black text-white">
-                            {history.opponent_score ?? '—'}
-                          </span>
-
-                          <span className="font-bold text-white">
-                            {history.opponent}
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-
-                    <div className="sm:text-right">
-
-                      {history.result && (
-                        <div
-                          className={`text-sm font-black uppercase tracking-wider ${
-                            history.result === 'W'
-                              ? 'text-emerald-400'
-                              : history.result === 'L'
-                                ? 'text-red-400'
-                                : 'text-slate-400'
-                          }`}
-                        >
-                          {history.result === 'W'
-                            ? 'Win'
-                            : history.result === 'L'
-                              ? 'Loss'
-                              : history.result}
-                        </div>
-                      )}
-
-                      {history.location && (
-                        <div className="mt-1 text-sm text-slate-500">
-                          {history.location}
-                        </div>
-                      )}
-
-                      {history.venue && (
-                        <div className="mt-1 text-xs text-slate-600">
-                          {history.venue}
-                        </div>
-                      )}
-
-                    </div>
-
-                  </div>
-
-                  {history.note && (
-                    <p className="mt-4 max-w-4xl pl-0 text-sm leading-6 text-slate-400 sm:pl-[3.75rem]">
-                      {history.note}
-                    </p>
-                  )}
-
-                </div>
-              ))}
-
-            </div>
-          ) : (
-            <div className="p-6">
-
-              <p className="text-sm text-slate-500">
-                No matchup history has been added yet.
-              </p>
-
-            </div>
-          )}
-
-        </section>
-
-        {/* OFFENSE / DEFENSE */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-          <section className="glass-panel rounded-2xl p-6">
-
-            <div className="mb-4 text-xs font-bold uppercase tracking-wider text-blue-400">
-              Offense
-            </div>
-
-            <p className="whitespace-pre-line leading-7 text-slate-300">
-              {game.offense_breakdown ||
-                'Offensive breakdown has not been added yet.'}
-            </p>
-
-          </section>
-
-          <section className="glass-panel rounded-2xl p-6">
-
-            <div className="mb-4 text-xs font-bold uppercase tracking-wider text-blue-400">
-              Defense
-            </div>
-
-            <p className="whitespace-pre-line leading-7 text-slate-300">
-              {game.defense_breakdown ||
-                'Defensive breakdown has not been added yet.'}
-            </p>
-
-          </section>
-
+    <main className="min-h-screen bg-slate-100 text-slate-900 font-sans pb-16 pt-6">
+      <div className="max-w-5xl mx-auto px-4 md:px-8 space-y-6">
+        {/* BACK LINK */}
+        <div>
+          <Link
+            href="/?tab=schedule"
+            className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-blue-900 hover:text-blue-700 transition"
+          >
+            ← Back to Schedule
+          </Link>
         </div>
 
-        {/* KEY MATCHUP */}
-        <section className="glass-panel rounded-2xl p-6">
-
-          <div className="mb-4 text-xs font-bold uppercase tracking-wider text-blue-400">
-            Key Matchup
+        {/* HERO BANNER */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
+          <div className="bg-slate-900 px-6 py-3 flex items-center justify-between border-b border-slate-800">
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-200">
+              {game.game_type || 'Regular Season Matchup'}
+            </span>
+            {game.conference && (
+              <span className="rounded-full bg-blue-900/80 border border-blue-700 px-3 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                {game.conference}
+              </span>
+            )}
           </div>
 
-          <p className="whitespace-pre-line leading-7 text-slate-300">
-            {game.key_matchup ||
-              'Key matchup has not been added yet.'}
-          </p>
+          <div className="p-6 md:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row items-center justify-around text-center gap-6 py-2">
+              <div className="flex-1">
+                <div className="text-3xl md:text-4xl font-extrabold text-blue-950 tracking-tight">
+                  Penn State
+                </div>
+                <div className="text-xs font-bold text-blue-700 uppercase tracking-widest mt-1">
+                  Nittany Lions
+                </div>
+              </div>
 
-        </section>
+              <div className="rounded-full bg-slate-100 px-4 py-2 font-mono text-sm font-black text-slate-500 border border-slate-200">
+                {game.is_home ? 'VS' : '@'}
+              </div>
 
-        {/* KEY STORYLINES */}
-        <section className="glass-panel rounded-2xl p-6">
-
-          <div className="mb-4 text-xs font-bold uppercase tracking-wider text-blue-400">
-            Key Storylines
-          </div>
-
-          <p className="whitespace-pre-line leading-7 text-slate-300">
-            {game.key_storylines ||
-              'Storylines have not been added yet.'}
-          </p>
-
-        </section>
-
-        {/* PREDICTION */}
-        <section className="glass-panel rounded-2xl p-6">
-
-          <div className="mb-4 text-xs font-bold uppercase tracking-wider text-blue-400">
-            Prediction / Outlook
-          </div>
-
-          <p className="whitespace-pre-line leading-7 text-slate-300">
-            {game.prediction ||
-              'Prediction has not been added yet.'}
-          </p>
-
-        </section>
-
-        {/* NOTES */}
-        {game.note && (
-          <section className="rounded-2xl border border-blue-400/10 bg-blue-500/[0.04] p-6">
-
-            <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-              Game Notes
+              <div className="flex-1">
+                <div className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+                  {game.opponent}
+                </div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
+                  Opponent
+                </div>
+              </div>
             </div>
 
-            <p className="text-sm leading-6 text-slate-300">
-              {game.note}
-            </p>
+            {/* GAME INFO BAR */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-slate-200 pt-6 text-center bg-slate-50/70 -mx-6 -mb-6 p-6">
+              <div>
+                <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                  Date
+                </div>
+                <div className="text-sm font-bold text-slate-900 mt-1">
+                  {formatDate(game.date)}
+                </div>
+              </div>
 
+              <div>
+                <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                  Kickoff
+                </div>
+                <div className="text-sm font-bold text-slate-900 mt-1">
+                  {formatTime(game.time)}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                  Location
+                </div>
+                <div className="text-sm font-bold text-slate-900 mt-1">
+                  {game.location || game.venue || 'TBD'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PREVIEW EDITORIAL */}
+        {game.preview && (
+          <section className="bg-white rounded-2xl p-6 md:p-8 border-l-4 border-l-blue-900 border border-slate-200 shadow-sm space-y-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-blue-800">
+              Matchup Preview
+            </h2>
+            <h3 className="text-xl font-bold text-slate-900">
+              Penn State vs. {game.opponent}
+            </h3>
+            <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+              {game.preview}
+            </p>
           </section>
         )}
 
+
+        {/* OFFENSE & DEFENSE BREAKDOWNS */}
+        {(game.offense_breakdown || game.defense_breakdown) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {game.offense_breakdown && (
+              <section className="bg-white rounded-2xl p-6 border-t-4 border-t-blue-800 border border-slate-200 shadow-sm space-y-2">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-blue-900">
+                  Offensive Strategy
+                </h2>
+                <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+                  {game.offense_breakdown}
+                </p>
+              </section>
+            )}
+
+            {game.defense_breakdown && (
+              <section className="bg-white rounded-2xl p-6 border-t-4 border-t-slate-800 border border-slate-200 shadow-sm space-y-2">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-800">
+                  Defensive Keys
+                </h2>
+                <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+                  {game.defense_breakdown}
+                </p>
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* KEY MATCHUP & STORYLINES */}
+        {game.key_matchup && (
+          <section className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-2">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              Key Matchup
+            </h2>
+            <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+              {game.key_matchup}
+            </p>
+          </section>
+        )}
+
+        {game.key_storylines && (
+          <section className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-2">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              Key Storylines
+            </h2>
+            <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+              {game.key_storylines}
+            </p>
+          </section>
+        )}
+
+        {/* PREDICTION & GAME NOTES */}
+        {game.prediction && (
+          <section className="bg-blue-900 text-white rounded-2xl p-6 md:p-8 shadow-md space-y-3">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-blue-200">
+              Prediction & Outlook
+            </h2>
+            <p className="text-sm leading-relaxed text-blue-50 whitespace-pre-line">
+              {game.prediction}
+            </p>
+          </section>
+        )}
+
+        {game.note && (
+          <section className="bg-amber-50 rounded-2xl p-4 border border-amber-200 text-xs text-amber-900 font-medium">
+            <span className="font-bold text-amber-950">Game Note:</span> {game.note}
+          </section>
+        )}
       </div>
     </main>
   );

@@ -14,27 +14,39 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-slate-950 text-slate-100">
-        <header className="border-b border-white/10 bg-slate-900/50 px-6 py-4">
-          <div className="mx-auto flex max-w-7xl items-center justify-between">
-            {/* Title */}
-            <Link
-              href="/"
-              className="text-xl font-black tracking-wider text-blue-500 hover:text-blue-400 transition"
-            >
-              Penn State Overview
+      <body className="bg-slate-50 text-slate-900 min-h-screen">
+        <header className="bg-blue-800 text-white sticky top-0 z-50 border-b border-blue-900 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <Link href="/" className="font-bold text-xl tracking-tight text-white flex items-center gap-3">
+              <img 
+                src="/penn-state-logo.jpeg" 
+                alt="Penn State Logo" 
+                className="h-9 w-auto rounded object-contain bg-white p-0.5"
+              />
+              <span className="tracking-wide uppercase font-extrabold text-lg">PENN STATE <span className="text-blue-200 font-semibold">FOOTBALL</span></span>
             </Link>
-
-            {/* Penn State Logo Image */}
-            <img
-              src="https://upload.wikimedia.org/wikipedia/en/3/3a/Penn_State_Nittany_Lions_logo.svg"
-              alt="Penn State Logo"
-              className="h-10 w-auto object-contain"
-            />
+            <nav className="flex items-center gap-6 text-sm font-semibold">
+              
+              <Link href="/?tab=schedule" className="hover:text-slate-900">
+  Schedule
+</Link>
+<Link href="/Depth-chart" className="text-blue-100 hover:text-white transition">
+                Depth Chart
+              </Link>
+              <Link href="/injury-report" className="text-blue-100 hover:text-white transition">
+                Injury Report
+              </Link>
+              <Link href="/staff" className="text-blue-100 hover:text-white transition">
+                Staff
+              </Link>
+              <Link href="/" className="text-blue-100 hover:text-white transition">
+                Roster
+              </Link>
+              
+            </nav>
           </div>
         </header>
-
-        {children}
+        <main className="max-w-7xl mx-auto px-4 py-6">{children}</main>
       </body>
     </html>
   );

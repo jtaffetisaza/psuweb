@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 interface Player {
@@ -61,10 +62,8 @@ interface DepthSlot {
   eligiblePositions: string[];
 }
 
-type DepthChartTab =
-  | 'offense'
-  | 'defense'
-  | 'special-teams';
+type NavTab = 'roster' | 'coaching' | 'schedule' | 'depth-chart' | 'injury-report';
+type DepthChartSubTab = 'offense' | 'defense' | 'special-teams';
 
 type DepthAssignments = Record<string, string[]>;
 
@@ -121,46 +120,25 @@ const SPECIAL_TEAMS_SLOTS: DepthSlot[] = [
 ];
 
 const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
-  QB: [
-    'Rocco Becht',
-    'Alex Manske',
-    'Connor Barry',
-    'Kase Evans',
-    'Jack Lambert',
-  ],
-
+  QB: ['Rocco Becht', 'Alex Manske', 'Connor Barry', 'Kase Evans', 'Jack Lambert'],
   RB: [
     'Carson Hansen',
     'James Peoples',
     'Quinton Martin Jr.',
     'Cam Wallace',
     "D'Antae Sheffey",
-    "Amar'e Glover",    
+    "Amar'e Glover",
     'Jeremy Washington',
   ],
-
-  X: [
-    'Chase Sowell',
-    'Zay Robinson',
-    'Keith Jones Jr.',
-    'Ben Whitver',
-  ],
-
-  Y: [
-    'Brett Eskildsen',
-    'Karon Brookins',
-    'Peter Gonzalez',
-    'Ethan Black',
-  ],
-
+  X: ['Chase Sowell', 'Zay Robinson', 'Keith Jones Jr.', 'Ben Whitver'],
+  Y: ['Brett Eskildsen', 'Karon Brookins', 'Peter Gonzalez', 'Ethan Black'],
   Z: [
-    'Koby Howard',
     'Amarion Jackson',
     'Lyrick Samuel',
     'Logan Cunningham',
     'Hank Lustig',
+    'Koby Howard',
   ],
-
   TE: [
     'Benjamin Brahmer',
     'Andrew Rappleyea',
@@ -169,9 +147,8 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Cooper Alexander',
     'Brian Kortovich',
     'Finn Furmanek',
-    'Jake Lukac'
+    'Jake Lukac',
   ],
-
   OT: [
     'Malachi Goodman',
     'Owen Aliciene',
@@ -179,26 +156,9 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Hunter Albright',
     'Pete Eglitis',
   ],
-
-  G1: [
-    'Trevor Buhr',
-    'Will Tompkins',
-    'Vaea Ikakoula',
-    'Liam Horan',
-  ],
-
-  C: [
-    'Brock Riker',
-    'Dominic Rulli',
-    'Jim Fitzgerald',
-  ],
-
-  G2: [
-    'Cooper Cousins',
-    'Tyshon Huff',
-    'Donnie Harbour',
-  ],
-
+  G1: ['Trevor Buhr', 'Vaea Ikakoula', 'Liam Horan', 'Will Tompkins'],
+  C: ['Brock Riker', 'Dominic Rulli', 'Jim Fitzgerald'],
+  G2: ['Cooper Cousins', 'Tyshon Huff', 'Donnie Harbour'],
   T: [
     'Anthony Donkoh',
     'Garrett Sexton',
@@ -206,7 +166,6 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Henry Boehme',
     'Kuol Kuol II',
   ],
-
   DE1: [
     'Yvan Kemajou',
     'LaVar Arrington II',
@@ -215,7 +174,6 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Bobby Mears',
     'Elijah Reeder',
   ],
-
   DT1: [
     'Siale Taupaki',
     'Armstrong Nnodim',
@@ -223,40 +181,18 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     "De'Andre Cook",
     'Caleb Brewer',
   ],
-
-  DT2: [
-    'Keanu Williams',
-    'Ty Blanding',
-    'Dallas Vakalahi',
-    'Liam Andrews',
-  ],
-
+  DT2: ['Keanu Williams', 'Ty Blanding', 'Dallas Vakalahi', 'Liam Andrews'],
   DE2: [
     'Ikenna Ezeogu',
     'Caleb Bacon',
     'Alexander McPherson',
-    'Mason Robinson',
     'Aidan Probst',
     'Jordan Mayer',
+    'Mason Robinson',
     'Max Granville',
   ],
-
-  ILB: [
-    'Kooper Ebel',
-    'Cael Brezina',
-    'Chris Fileppo',
-    'Keian Kaiser', 
-    'Josh Banks',
-  ],
-
-  OLB: [
-    'Tony Rojas',
-    'Cam Smith',
-    'Alex Tatsch',
-    'John Klosterman',
-    'Evan Wolff',
-  ],
-
+  ILB: ['Kooper Ebel', 'Cael Brezina', 'Chris Fileppo', 'Keian Kaiser', 'Josh Banks'],
+  OLB: ['Tony Rojas', 'Cam Smith', 'Alex Tatsch', 'John Klosterman', 'Evan Wolff'],
   CB: [
     'Audavion Collins',
     'Zion Tracy',
@@ -264,7 +200,6 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Joshua Johnson',
     'Tyler Armstead',
   ],
-
   NICKLE: [
     'Josiah Zayas',
     'Daryus Dixson',
@@ -276,121 +211,43 @@ const STATIC_DEPTH_ASSIGNMENTS: DepthAssignments = {
     'Bryson Williams',
     'Jashaun Green',
   ],
-
-  SS: [
-    'Marcus Neal Jr.',
-    'Jamison Patton',
-    'Ibn McDaniels',
-    'Christian Askew',
-  ],
-
-  FS: [
-    'Jeremiah Cooper',
-    'Vaboue Toure',
-    'Omarion Davis',
-    'Jake Laverde',
-  ],
-
-  K: [
-    'Ryan Barker',
-    'Cristiano Rosa',
-    'Matthew Parker',
-  ],
-
-  P: [
-    'Nathan Tiyce',
-    'Lucas Tenbrock',
-  ],
-
-  LS: [
-    'Blaise Sokach-Minnick',
-    'Andrew Dufault',
-  ],
-
-  KR: [
-    'Zay Robinson',
-    'Zion Tracy',
-    'Quinton Martin Jr.',
-  ],
-
-  PR: [
-    'Zay Robinson',
-    'Zion Tracy',
-    'Koby Howard',
-  ],
+  SS: ['Marcus Neal Jr.', 'Jamison Patton', 'Ibn McDaniels', 'Christian Askew'],
+  FS: ['Jeremiah Cooper', 'Vaboue Toure', 'Omarion Davis', 'Jake Laverde'],
+  K: ['Ryan Barker', 'Cristiano Rosa', 'Matthew Parker'],
+  P: ['Nathan Tiyce', 'Lucas Tenbrock'],
+  LS: ['Blaise Sokach-Minnick', 'Andrew Dufault'],
+  KR: ['Zay Robinson', 'Zion Tracy', 'Quinton Martin Jr.'],
+  PR: ['Zay Robinson', 'Zion Tracy', 'Koby Howard'],
 };
 
-type MatchupField =
-  | 'preview'
-  | 'offense_breakdown'
-  | 'defense_breakdown'
-  | 'key_matchup'
-  | 'key_storylines'
-  | 'prediction'
-  | 'note';
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get('tab') as NavTab) || 'roster';
 
-export default function RosterDashboard() {
-  const [activeTab, setActiveTab] = useState<
-    'roster' |
-    'coaching' |
-    'schedule' |
-    'depth-chart' |
-    'matchup-editor'
-  >('roster');
-
+  const [activeTab, setActiveTab] = useState<NavTab>(initialTab);
   const [players, setPlayers] = useState<Player[]>([]);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [schedule, setSchedule] = useState<Game[]>([]);
 
-  const [selectedPosition, setSelectedPosition] =
-    useState('ALL');
-
+  const [selectedPosition, setSelectedPosition] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'number' | 'name'>('number');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const [sortBy, setSortBy] = useState<
-    'number' | 'name'
-  >('number');
-
-  const [sortOrder, setSortOrder] = useState<
-    'asc' | 'desc'
-  >('asc');
-
-  const [editingNotesId, setEditingNotesId] =
-    useState<number | null>(null);
-
-  const [tempNotes, setTempNotes] = useState('');
-
-  const [depthChartTab, setDepthChartTab] =
-    useState<DepthChartTab>('offense');
-
-  const [selectedMatchupId, setSelectedMatchupId] =
-    useState<number | null>(null);
-
-  const [matchupDraft, setMatchupDraft] =
-    useState<Record<MatchupField, string>>({
-      preview: '',
-      offense_breakdown: '',
-      defense_breakdown: '',
-      key_matchup: '',
-      key_storylines: '',
-      prediction: '',
-      note: '',
-    });
-
-  const [savingMatchup, setSavingMatchup] =
-    useState(false);
-
-  const [generatingMatchup, setGeneratingMatchup] =
-    useState(false);
-
-  const [matchupSaved, setMatchupSaved] =
-    useState(false);
+  const [depthChartSubTab, setDepthChartSubTab] = useState<DepthChartSubTab>('offense');
 
   useEffect(() => {
     fetchPlayers();
     fetchStaffData();
     fetchSchedule();
   }, []);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as NavTab;
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   async function fetchPlayers() {
     const { data, error } = await supabase
@@ -400,10 +257,7 @@ export default function RosterDashboard() {
       .order('number', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching players:',
-        error
-      );
+      console.error('Error fetching players:', error);
       return;
     }
 
@@ -417,10 +271,7 @@ export default function RosterDashboard() {
       .order('id', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching staff:',
-        error
-      );
+      console.error('Error fetching staff:', error);
       return;
     }
 
@@ -435,441 +286,115 @@ export default function RosterDashboard() {
       .order('date', { ascending: true });
 
     if (error) {
-      console.error(
-        'Error fetching matchups:',
-        error
-      );
+      console.error('Error fetching matchups:', error);
       return;
     }
 
     setSchedule((data || []) as Game[]);
   }
 
-  async function saveNotes(id: number) {
-    const { error } = await supabase
-      .from('players')
-      .update({ notes: tempNotes })
-      .eq('id', id);
-
-    if (error) {
-      console.error(
-        'Error saving notes:',
-        error
-      );
-      return;
-    }
-
-    setPlayers((currentPlayers) =>
-      currentPlayers.map((player) =>
-        player.id === id
-          ? {
-              ...player,
-              notes: tempNotes,
-            }
-          : player
-      )
-    );
-
-    setEditingNotesId(null);
-  }
-
-  function handleSortToggle(
-    field: 'number' | 'name'
-  ) {
+  function handleSortToggle(field: 'number' | 'name') {
     if (sortBy === field) {
-      setSortOrder((currentOrder) =>
-        currentOrder === 'asc'
-          ? 'desc'
-          : 'asc'
-      );
+      setSortOrder((currentOrder) => (currentOrder === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortBy(field);
       setSortOrder('asc');
     }
   }
 
-  function loadMatchupEditor(
-    matchup: Game
-  ) {
-    setSelectedMatchupId(matchup.id);
-
-    setMatchupDraft({
-      preview: matchup.preview || '',
-      offense_breakdown:
-        matchup.offense_breakdown || '',
-      defense_breakdown:
-        matchup.defense_breakdown || '',
-      key_matchup:
-        matchup.key_matchup || '',
-      key_storylines:
-        matchup.key_storylines || '',
-      prediction:
-        matchup.prediction || '',
-      note: matchup.note || '',
-    });
-
-    setMatchupSaved(false);
-  }
-
-  function updateMatchupDraft(
-    field: MatchupField,
-    value: string
-  ) {
-    setMatchupDraft((current) => ({
-      ...current,
-      [field]: value,
-    }));
-
-    setMatchupSaved(false);
-  }
-
-  async function generateMatchupDraft() {
-    if (!selectedMatchupId) {
-      return;
-    }
-
-    setGeneratingMatchup(true);
-    setMatchupSaved(false);
-
-    try {
-      const response = await fetch(
-        '/api/matchup-generate',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json',
-          },
-          body: JSON.stringify({
-            matchupId:
-              selectedMatchupId,
-          }),
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (
-        !response.ok ||
-        !data.success
-      ) {
-        throw new Error(
-          data.error ||
-            'Failed to generate matchup draft'
-        );
-      }
-
-      setMatchupDraft(
-        (current) => ({
-          ...current,
-          preview:
-            data.generated
-              ?.preview || '',
-          offense_breakdown:
-            data.generated
-              ?.offense_breakdown ||
-            '',
-          defense_breakdown:
-            data.generated
-              ?.defense_breakdown ||
-            '',
-          key_matchup:
-            data.generated
-              ?.key_matchup || '',
-          key_storylines:
-            data.generated
-              ?.key_storylines ||
-            '',
-          prediction:
-            data.generated
-              ?.prediction || '',
-        })
-      );
-    } catch (error) {
-      console.error(
-        'AI matchup generation error:',
-        error
-      );
-
-      alert(
-        error instanceof Error
-          ? error.message
-          : 'Failed to generate matchup draft'
-      );
-    } finally {
-      setGeneratingMatchup(
-        false
-      );
-    }
-  }
-
-  async function saveMatchupContent() {
-    if (!selectedMatchupId) {
-      return;
-    }
-
-    setSavingMatchup(true);
-    setMatchupSaved(false);
-
-    const { error } = await supabase
-      .from('matchups')
-      .update({
-        preview: matchupDraft.preview || null,
-        offense_breakdown:
-          matchupDraft.offense_breakdown || null,
-        defense_breakdown:
-          matchupDraft.defense_breakdown || null,
-        key_matchup:
-          matchupDraft.key_matchup || null,
-        key_storylines:
-          matchupDraft.key_storylines || null,
-        prediction:
-          matchupDraft.prediction || null,
-        note: matchupDraft.note || null,
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq(
-        'id',
-        selectedMatchupId
-      );
-
-    setSavingMatchup(false);
-
-    if (error) {
-      console.error(
-        'Error saving matchup:',
-        error
-      );
-      return;
-    }
-
-    setSchedule((current) =>
-      current.map((game) =>
-        game.id === selectedMatchupId
-          ? {
-              ...game,
-              preview:
-                matchupDraft.preview ||
-                null,
-              offense_breakdown:
-                matchupDraft.offense_breakdown ||
-                null,
-              defense_breakdown:
-                matchupDraft.defense_breakdown ||
-                null,
-              key_matchup:
-                matchupDraft.key_matchup ||
-                null,
-              key_storylines:
-                matchupDraft.key_storylines ||
-                null,
-              prediction:
-                matchupDraft.prediction ||
-                null,
-              note:
-                matchupDraft.note ||
-                null,
-            }
-          : game
-      )
-    );
-
-    setMatchupSaved(true);
-  }
-
-  const selectedMatchup =
-    schedule.find(
-      (game) =>
-        game.id ===
-        selectedMatchupId
-    ) || null;
+  const isPlayerInjured = (status?: string) => {
+    const normalized = String(status || '').trim().toUpperCase();
+    return ['IR_OUT', 'IR - OUT', 'IR OUT', 'IR', 'OUT', 'INJURED'].includes(normalized);
+  };
 
   const filteredPlayers = players
     .filter((player) => {
       const matchesPosition =
-        selectedPosition === 'ALL' ||
-        player.position ===
-          selectedPosition;
+        selectedPosition === 'ALL' || player.position === selectedPosition;
 
       const matchesSearch =
-        player.name
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          ) ||
-        player.number
-          .toString()
-          .includes(search);
+        player.name.toLowerCase().includes(search.toLowerCase()) ||
+        player.number.toString().includes(search);
 
-      return (
-        matchesPosition &&
-        matchesSearch
-      );
+      return matchesPosition && matchesSearch;
     })
     .sort((a, b) => {
       let comparison = 0;
-
-      if (
-        sortBy === 'number'
-      ) {
-        comparison =
-          a.number - b.number;
+      if (sortBy === 'number') {
+        comparison = a.number - b.number;
       } else {
-        comparison =
-          a.name.localeCompare(
-            b.name
-          );
+        comparison = a.name.localeCompare(b.name);
       }
-
-      return sortOrder === 'asc'
-        ? comparison
-        : -comparison;
+      return sortOrder === 'asc' ? comparison : -comparison;
     });
 
-  const filteredStaff =
-    staff.filter(
-      (member) =>
-        member.name
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          ) ||
-        member.title
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          )
-    );
+  const filteredStaff = staff.filter(
+    (member) =>
+      member.name.toLowerCase().includes(search.toLowerCase()) ||
+      member.title.toLowerCase().includes(search.toLowerCase())
+  );
 
-  function getSlotsForTab(
-    tab: DepthChartTab
-  ): DepthSlot[] {
-    if (tab === 'offense') {
-      return OFFENSE_SLOTS;
-    }
+  const injuredPlayers = players.filter((player) => isPlayerInjured(player.status));
 
-    if (tab === 'defense') {
-      return DEFENSE_SLOTS;
-    }
-
+  function getSlotsForSubTab(tab: DepthChartSubTab): DepthSlot[] {
+    if (tab === 'offense') return OFFENSE_SLOTS;
+    if (tab === 'defense') return DEFENSE_SLOTS;
     return SPECIAL_TEAMS_SLOTS;
   }
 
-  function normalizePlayerName(
-    name: string
-  ) {
+  function normalizePlayerName(name: string) {
     return name
       .toLowerCase()
-      .replace(
-        /[’‘`]/g,
-        "'"
-      )
-      .replace(
-        /\s+/g,
-        ' '
-      )
+      .replace(/[’‘`]/g, "'")
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
-  function getPlayerByName(
-    playerName: string
-  ): Player | undefined {
-    const normalizedTarget =
-      normalizePlayerName(
-        playerName
-      );
-
+  function getPlayerByName(playerName: string): Player | undefined {
+    const normalizedTarget = normalizePlayerName(playerName);
     return players.find(
-      (player) =>
-        normalizePlayerName(
-          player.name
-        ) ===
-        normalizedTarget
+      (player) => normalizePlayerName(player.name) === normalizedTarget
     );
   }
 
-  function getDepthChartPlayers(
-    tab: DepthChartTab
-  ) {
-    let positionPool: string[] =
-      [];
-
-    if (
-      tab === 'offense'
-    ) {
-      positionPool = [
-        'QB',
-        'RB',
-        'WR',
-        'TE',
-        'OL',
-      ];
-    } else if (
-      tab === 'defense'
-    ) {
-      positionPool = [
-        'DE',
-        'DT',
-        'LB',
-        'CB',
-        'S',
-      ];
+  function getUnassignedDepthPlayers(tab: DepthChartSubTab) {
+    let positionPool: string[] = [];
+    if (tab === 'offense') {
+      positionPool = ['QB', 'RB', 'WR', 'TE', 'OL'];
+    } else if (tab === 'defense') {
+      positionPool = ['DE', 'DT', 'LB', 'CB', 'S'];
     } else {
-      positionPool = [
-        'K',
-        'P',
-        'LS',
-      ];
+      positionPool = ['K', 'P', 'LS'];
     }
 
-    const assignedPlayerNames =
-      new Set(
-        Object.values(
-          STATIC_DEPTH_ASSIGNMENTS
-        )
-          .flat()
-          .map(
-            normalizePlayerName
-          )
-      );
+    const assignedPlayerNames = new Set(
+      Object.values(STATIC_DEPTH_ASSIGNMENTS)
+        .flat()
+        .map(normalizePlayerName)
+    );
 
     return players.filter(
       (player) =>
-        positionPool.includes(
-          player.position
-        ) &&
-        !assignedPlayerNames.has(
-          normalizePlayerName(
-            player.name
-          )
-        )
+        positionPool.includes(player.position) &&
+        !assignedPlayerNames.has(normalizePlayerName(player.name))
     );
   }
 
-  function renderPlayerCard(
-    player: Player,
-    compact = false
-  ) {
-    const cardPadding =
-      compact
-        ? 'p-3'
-        : 'p-4';
-
-    const isIR = String(player.status || '').trim().toUpperCase() === 'IR_OUT';
+  function renderPlayerCard(player: Player, compact = false) {
+    const cardPadding = compact ? 'p-3' : 'p-4';
+    const isIR = isPlayerInjured(player.status);
 
     return (
       <div
         key={player.id}
         className={`rounded-xl border transition ${cardPadding} ${
           isIR
-            ? 'border-red-800/80 bg-red-950/40 border-l-4 border-l-red-500'
-            : 'border-white/10 bg-slate-900/90'
+            ? 'border-red-300 bg-red-50 border-l-4 border-l-red-600'
+            : 'border-slate-200 bg-white shadow-sm'
         }`}
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 font-mono text-sm font-bold text-blue-300">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 font-mono text-sm font-bold text-slate-700 border border-slate-200">
             #{player.number}
           </div>
 
@@ -877,25 +402,23 @@ export default function RosterDashboard() {
             <div className="flex items-center gap-2 flex-wrap">
               <Link
                 href={`/player/${player.id}`}
-                className={`block truncate font-semibold transition hover:text-blue-400 hover:underline ${
-                  isIR ? 'text-red-300 line-through' : 'text-white'
+                className={`block truncate font-bold transition hover:underline ${
+                  isIR ? 'text-red-700 line-through' : 'text-slate-900 hover:text-blue-800'
                 }`}
               >
                 {player.name}
               </Link>
 
               {isIR && (
-                <span className="rounded-full bg-red-900 border border-red-500/60 px-2 py-0.5 text-[10px] font-bold text-red-100 uppercase tracking-wide">
-                  IR - Out
+                <span className="rounded-full bg-red-100 border border-red-300 px-2 py-0.5 text-[10px] font-bold text-red-800 uppercase tracking-wide">
+                  {player.status || 'IR - Out'}
                 </span>
               )}
             </div>
 
-            <div className="mt-0.5 text-xs text-slate-500">
+            <div className="mt-0.5 text-xs text-slate-500 font-medium">
               {player.position}
-              {player.eligibility
-                ? ` • ${player.eligibility}`
-                : ''}
+              {player.eligibility ? ` • ${player.eligibility}` : ''}
             </div>
           </div>
         </div>
@@ -903,107 +426,84 @@ export default function RosterDashboard() {
     );
   }
 
-  function renderDepthSlot(
-    slot: DepthSlot
-  ) {
-    const assignedPlayers =
-      STATIC_DEPTH_ASSIGNMENTS[
-        slot.id
-      ] || [];
+  function renderDepthSlot(slot: DepthSlot) {
+    const rawAssignedPlayers = STATIC_DEPTH_ASSIGNMENTS[slot.id] || [];
+
+    const activePlayers: { playerName: string; player?: Player }[] = [];
+    const injuredSlotPlayers: { playerName: string; player?: Player }[] = [];
+
+    rawAssignedPlayers.forEach((playerName) => {
+      const player = getPlayerByName(playerName);
+      if (isPlayerInjured(player?.status)) {
+        injuredSlotPlayers.push({ playerName, player });
+      } else {
+        activePlayers.push({ playerName, player });
+      }
+    });
+
+    const sortedPlayers = [...activePlayers, ...injuredSlotPlayers];
 
     return (
       <div
         key={slot.id}
-        className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
+        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
       >
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Position
             </div>
-
-            <div className="text-lg font-bold text-white">
-              {slot.label}
-            </div>
+            <div className="text-lg font-bold text-slate-900">{slot.label}</div>
           </div>
 
-          <div className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-            {slot.eligiblePositions.join(
-              ' / '
-            )}
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+            {slot.eligiblePositions.join(' / ')}
           </div>
         </div>
 
         <div className="space-y-2">
-          {assignedPlayers.length ===
-          0 ? (
-            <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-5 text-center text-xs text-slate-600">
+          {sortedPlayers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-xs text-slate-500">
               No player assigned
             </div>
           ) : (
-            assignedPlayers.map(
-              (
-                playerName,
-                index
-              ) => {
-                const player =
-                  getPlayerByName(
-                    playerName
-                  );
-
-                if (!player) {
-                  return (
-                    <div
-                      key={`${slot.id}-${playerName}`}
-                      className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3"
-                    >
-                      <div className="text-xs font-semibold text-red-400">
-                        Player not found
-                      </div>
-
-                      <div className="mt-1 text-sm text-slate-400">
-                        {playerName}
-                      </div>
-                    </div>
-                  );
-                }
-
-                let stringLabel =
-                  `${index + 1}th String`;
-
-                if (
-                  index === 0
-                ) {
-                  stringLabel =
-                    '1st String';
-                } else if (
-                  index === 1
-                ) {
-                  stringLabel =
-                    '2nd String';
-                } else if (
-                  index === 2
-                ) {
-                  stringLabel =
-                    '3rd String';
-                }
-
+            sortedPlayers.map(({ playerName, player }, index) => {
+              if (!player) {
                 return (
                   <div
-                    key={`${slot.id}-${player.id}`}
+                    key={`${slot.id}-${playerName}`}
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3"
                   >
-                    <div className="mb-1 ml-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      {stringLabel}
+                    <div className="text-xs font-semibold text-red-700">
+                      Player not found
                     </div>
-
-                    {renderPlayerCard(
-                      player,
-                      true
-                    )}
+                    <div className="mt-1 text-sm text-slate-600">
+                      {playerName}
+                    </div>
                   </div>
                 );
               }
-            )
+
+              const isIR = isPlayerInjured(player.status);
+
+              let stringLabel = `${index + 1}th String`;
+              if (index === 0) stringLabel = '1st String';
+              else if (index === 1) stringLabel = '2nd String';
+              else if (index === 2) stringLabel = '3rd String';
+
+              if (isIR) {
+                stringLabel = 'Injured / Out';
+              }
+
+              return (
+                <div key={`${slot.id}-${player.id}`}>
+                  <div className="mb-1 ml-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    {stringLabel}
+                  </div>
+                  {renderPlayerCard(player, true)}
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -1011,68 +511,47 @@ export default function RosterDashboard() {
   }
 
   function renderDepthChart() {
-    const slots =
-      getSlotsForTab(
-        depthChartTab
-      );
+    const slots = getSlotsForSubTab(depthChartSubTab);
 
     return (
       <div className="space-y-6">
-        <div className="glass-panel rounded-2xl p-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-white">
-              Depth Chart
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-400">
+            <h2 className="text-lg font-bold text-slate-900">Depth Chart</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
               2026 Penn State depth chart
             </p>
           </div>
 
-          <div className="mt-5 flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5">
+          <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-100 p-1.5 self-start sm:self-auto">
             <button
-              onClick={() =>
-                setDepthChartTab(
-                  'offense'
-                )
-              }
-              className={`flex-1 whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-                depthChartTab ===
-                'offense'
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              onClick={() => setDepthChartSubTab('offense')}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                depthChartSubTab === 'offense'
+                  ? 'bg-blue-800 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
               }`}
             >
               Offense
             </button>
 
             <button
-              onClick={() =>
-                setDepthChartTab(
-                  'defense'
-                )
-              }
-              className={`flex-1 whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-                depthChartTab ===
-                'defense'
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              onClick={() => setDepthChartSubTab('defense')}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                depthChartSubTab === 'defense'
+                  ? 'bg-blue-800 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
               }`}
             >
               Defense
             </button>
 
             <button
-              onClick={() =>
-                setDepthChartTab(
-                  'special-teams'
-                )
-              }
-              className={`flex-1 whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-                depthChartTab ===
-                'special-teams'
-                  ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+              onClick={() => setDepthChartSubTab('special-teams')}
+              className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                depthChartSubTab === 'special-teams'
+                  ? 'bg-blue-800 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
               }`}
             >
               Special Teams
@@ -1081,572 +560,19 @@ export default function RosterDashboard() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {slots.map(
-            (slot) =>
-              renderDepthSlot(
-                slot
-              )
-          )}
+          {slots.map((slot) => renderDepthSlot(slot))}
         </div>
 
-        {getDepthChartPlayers(
-          depthChartTab
-        ).length > 0 && (
-          <div className="glass-panel rounded-2xl p-4">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
+        {getUnassignedDepthPlayers(depthChartSubTab).length > 0 && (
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Unassigned Players
             </h3>
 
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {getDepthChartPlayers(
-                depthChartTab
-              ).map((player) =>
-                renderPlayerCard(
-                  player,
-                  true
-                )
+              {getUnassignedDepthPlayers(depthChartSubTab).map((player) =>
+                renderPlayerCard(player, true)
               )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderPositionEditor(
-    position: string
-  ) {
-    let relevantSlots: DepthSlot[] =
-      [];
-
-    if (
-      position === 'QB'
-    ) {
-      relevantSlots =
-        OFFENSE_SLOTS.filter(
-          (slot) =>
-            slot.id === 'QB'
-        );
-    } else if (
-      position === 'RB'
-    ) {
-      relevantSlots =
-        OFFENSE_SLOTS.filter(
-          (slot) =>
-            slot.id === 'RB'
-        );
-    } else if (
-      position === 'WR'
-    ) {
-      relevantSlots =
-        OFFENSE_SLOTS.filter(
-          (slot) =>
-            slot.eligiblePositions.includes(
-              'WR'
-            )
-        );
-    } else if (
-      position === 'TE'
-    ) {
-      relevantSlots =
-        OFFENSE_SLOTS.filter(
-          (slot) =>
-            slot.id === 'TE'
-        );
-    } else if (
-      position === 'OL'
-    ) {
-      relevantSlots =
-        OFFENSE_SLOTS.filter(
-          (slot) =>
-            slot.eligiblePositions.includes(
-              'OL'
-            )
-        );
-    } else if (
-      position === 'DE'
-    ) {
-      relevantSlots =
-        DEFENSE_SLOTS.filter(
-          (slot) =>
-            slot.eligiblePositions.includes(
-              'DE'
-            )
-        );
-    } else if (
-      position === 'DT'
-    ) {
-      relevantSlots =
-        DEFENSE_SLOTS.filter(
-          (slot) =>
-            slot.eligiblePositions.includes(
-              'DT'
-            )
-        );
-    } else if (
-      position === 'LB'
-    ) {
-      relevantSlots =
-        DEFENSE_SLOTS.filter(
-          (slot) =>
-            slot.eligiblePositions.includes(
-              'LB'
-            )
-        );
-    } else if (
-      position === 'CB'
-    ) {
-      relevantSlots =
-        DEFENSE_SLOTS.filter(
-          (slot) =>
-            slot.eligiblePositions.includes(
-              'CB'
-            )
-        );
-    } else if (
-      position === 'S'
-    ) {
-      relevantSlots =
-        DEFENSE_SLOTS.filter(
-          (slot) =>
-            slot.eligiblePositions.includes(
-              'S'
-            )
-        );
-    } else if (
-      position === 'K'
-    ) {
-      relevantSlots =
-        SPECIAL_TEAMS_SLOTS.filter(
-          (slot) =>
-            slot.id === 'K'
-        );
-    } else if (
-      position === 'P'
-    ) {
-      relevantSlots =
-        SPECIAL_TEAMS_SLOTS.filter(
-          (slot) =>
-            slot.id === 'P'
-        );
-    } else if (
-      position === 'LS'
-    ) {
-      relevantSlots =
-        SPECIAL_TEAMS_SLOTS.filter(
-          (slot) =>
-            slot.id === 'LS'
-        );
-    }
-
-    const positionPlayers =
-      players.filter(
-        (player) =>
-          player.position ===
-          position
-      );
-
-    const assignedToRelevantSlots =
-      new Set(
-        relevantSlots
-          .flatMap(
-            (slot) =>
-              STATIC_DEPTH_ASSIGNMENTS[
-                slot.id
-              ] || []
-          )
-          .map(
-            normalizePlayerName
-          )
-      );
-
-    const availablePlayers =
-      positionPlayers.filter(
-        (player) =>
-          !assignedToRelevantSlots.has(
-            normalizePlayerName(
-              player.name
-            )
-          )
-      );
-
-    return (
-      <div className="space-y-6">
-        <div className="glass-panel rounded-2xl p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-white">
-                {position} Depth Chart
-              </h2>
-
-              <p className="text-sm text-slate-400">
-                Static depth chart
-              </p>
-            </div>
-
-            <div className="text-xs text-slate-500">
-              {positionPlayers.length}{' '}
-              players on roster
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
-          <div className="glass-panel rounded-2xl p-4">
-            <div className="mb-4">
-              <h3 className="font-bold text-white">
-                Available {position}
-              </h3>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Players not currently assigned.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              {availablePlayers.length ===
-              0 ? (
-                <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/30 px-4 py-6 text-center text-xs text-slate-600">
-                  All players assigned.
-                </div>
-              ) : (
-                availablePlayers.map(
-                  (player) =>
-                    renderPlayerCard(
-                      player,
-                      true
-                    )
-                )
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {relevantSlots.map(
-              (slot) =>
-                renderDepthSlot(
-                  slot
-                )
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderMatchupEditor() {
-    return (
-      <div className="space-y-6">
-        <div className="glass-panel rounded-2xl p-5">
-          <div>
-            <h2 className="text-xl font-bold text-white">
-              Matchup Editor
-            </h2>
-
-            <p className="mt-1 text-sm leading-6 text-slate-400">
-              Manage the editorial content for each
-              matchup. Everything saved here is displayed
-              automatically on that opponent matchup page.
-            </p>
-          </div>
-
-          <div className="mt-5">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Select matchup
-            </label>
-
-            <select
-              value={
-                selectedMatchupId ?? ''
-              }
-              onChange={(event) => {
-                const id =
-                  Number(
-                    event.target.value
-                  );
-
-                const matchup =
-                  schedule.find(
-                    (game) =>
-                      game.id === id
-                  );
-
-                if (matchup) {
-                  loadMatchupEditor(
-                    matchup
-                  );
-                }
-              }}
-              className="dark-field w-full px-4 py-3 text-sm"
-            >
-              <option value="">
-                Select a 2026 matchup...
-              </option>
-
-              {schedule.map(
-                (game) => (
-                  <option
-                    key={game.id}
-                    value={game.id}
-                  >
-                    {game.date} — Penn State vs.{' '}
-                    {game.opponent}
-                  </option>
-                )
-              )}
-            </select>
-          </div>
-        </div>
-
-        {!selectedMatchup ? (
-          <div className="glass-panel rounded-2xl p-10 text-center">
-            <div className="text-sm font-semibold text-slate-300">
-              Select a matchup to begin
-            </div>
-
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Choose an opponent above to edit its preview,
-              key matchups, storylines, prediction, and
-              other editorial content.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="glass-panel rounded-2xl p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Selected matchup
-                  </div>
-
-                  <h2 className="mt-1 text-2xl font-bold text-white">
-                    Penn State vs.{' '}
-                    {selectedMatchup.opponent}
-                  </h2>
-
-                  <p className="mt-1 text-sm text-slate-400">
-                    {selectedMatchup.date}
-                    {selectedMatchup.time
-                      ? ` • ${selectedMatchup.time.slice(0, 5)}`
-                      : ''}
-                    {selectedMatchup.location
-                      ? ` • ${selectedMatchup.location}`
-                      : ''}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={
-                      generateMatchupDraft
-                    }
-                    disabled={
-                      generatingMatchup ||
-                      savingMatchup
-                    }
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {generatingMatchup
-                      ? 'Generating...'
-                      : 'Generate AI Draft'}
-                  </button>
-
-                  <Link
-                    href={`/matchup/${selectedMatchup.id}`}
-                    target="_blank"
-                    className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20 hover:text-blue-200"
-                  >
-                    View Matchup Page
-                  </Link>
-                </div>
-              </div>
-
-              {generatingMatchup && (
-                <div className="mt-4 rounded-xl border border-blue-400/20 bg-blue-500/5 px-4 py-3 text-sm text-blue-300">
-                  Generating a matchup preview. Your existing
-                  content will not be saved or overwritten until
-                  you click Save Matchup Content.
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <div className="glass-panel rounded-2xl p-5 xl:col-span-2">
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Matchup Preview
-                </label>
-
-                <textarea
-                  value={
-                    matchupDraft.preview
-                  }
-                  onChange={(event) =>
-                    updateMatchupDraft(
-                      'preview',
-                      event.target.value
-                    )
-                  }
-                  rows={8}
-                  placeholder="Write the overall matchup preview..."
-                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
-                />
-              </div>
-
-              <div className="glass-panel rounded-2xl p-5">
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Offense Breakdown
-                </label>
-
-                <textarea
-                  value={
-                    matchupDraft.offense_breakdown
-                  }
-                  onChange={(event) =>
-                    updateMatchupDraft(
-                      'offense_breakdown',
-                      event.target.value
-                    )
-                  }
-                  rows={8}
-                  placeholder="How Penn State should attack offensively..."
-                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
-                />
-              </div>
-
-              <div className="glass-panel rounded-2xl p-5">
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Defense Breakdown
-                </label>
-
-                <textarea
-                  value={
-                    matchupDraft.defense_breakdown
-                  }
-                  onChange={(event) =>
-                    updateMatchupDraft(
-                      'defense_breakdown',
-                      event.target.value
-                    )
-                  }
-                  rows={8}
-                  placeholder="How Penn State should defend the opponent..."
-                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
-                />
-              </div>
-
-              <div className="glass-panel rounded-2xl p-5">
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Key Matchup
-                </label>
-
-                <textarea
-                  value={
-                    matchupDraft.key_matchup
-                  }
-                  onChange={(event) =>
-                    updateMatchupDraft(
-                      'key_matchup',
-                      event.target.value
-                    )
-                  }
-                  rows={6}
-                  placeholder="Example: Penn State pass rush vs. opponent QB..."
-                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
-                />
-              </div>
-
-              <div className="glass-panel rounded-2xl p-5">
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Key Storylines
-                </label>
-
-                <textarea
-                  value={
-                    matchupDraft.key_storylines
-                  }
-                  onChange={(event) =>
-                    updateMatchupDraft(
-                      'key_storylines',
-                      event.target.value
-                    )
-                  }
-                  rows={6}
-                  placeholder="Enter one storyline per line..."
-                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
-                />
-              </div>
-
-              <div className="glass-panel rounded-2xl p-5">
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Prediction / Outlook
-                </label>
-
-                <textarea
-                  value={
-                    matchupDraft.prediction
-                  }
-                  onChange={(event) =>
-                    updateMatchupDraft(
-                      'prediction',
-                      event.target.value
-                    )
-                  }
-                  rows={7}
-                  placeholder="Write the expected game outlook and prediction..."
-                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
-                />
-              </div>
-
-              <div className="glass-panel rounded-2xl p-5">
-                <label className="mb-2 block text-sm font-semibold text-white">
-                  Internal / Display Note
-                </label>
-
-                <textarea
-                  value={
-                    matchupDraft.note
-                  }
-                  onChange={(event) =>
-                    updateMatchupDraft(
-                      'note',
-                      event.target.value
-                    )
-                  }
-                  rows={7}
-                  placeholder="Optional matchup note..."
-                  className="dark-field w-full resize-y px-4 py-3 text-sm leading-6"
-                />
-              </div>
-            </div>
-
-            <div className="glass-panel flex flex-col gap-3 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                {matchupSaved ? (
-                  <div className="text-sm font-semibold text-emerald-400">
-                    Matchup content saved.
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-500">
-                    Changes are saved directly to the matchup.
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={
-                  saveMatchupContent
-                }
-                disabled={
-                  savingMatchup ||
-                  generatingMatchup
-                }
-                className="blue-button px-6 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {savingMatchup
-                  ? 'Saving...'
-                  : 'Save Matchup Content'}
-              </button>
             </div>
           </div>
         )}
@@ -1655,158 +581,50 @@ export default function RosterDashboard() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-8 font-sans text-slate-100 sm:px-8 lg:py-12">
-      <header className="mx-auto mb-8 max-w-7xl">
-        <h1 className="mb-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          2026 Football Dashboard
-        </h1>
-
-        <p className="max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
-          Manage player roster, scouting notes,
-          coaching personnel, schedule, depth chart,
-          and matchup editorial content.
-        </p>
-      </header>
-
-      <main className="mx-auto max-w-7xl space-y-6">
-        {/* MAIN NAVIGATION */}
-        <div className="flex w-full gap-1 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/60 p-1.5 shadow-xl shadow-black/20 backdrop-blur">
-          <button
-            onClick={() =>
-              setActiveTab('roster')
-            }
-            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'roster'
-                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Player Roster
-          </button>
-
-          <button
-            onClick={() =>
-              setActiveTab('coaching')
-            }
-            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'coaching'
-                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Coaching Staff
-          </button>
-
-          <button
-            onClick={() =>
-              setActiveTab('schedule')
-            }
-            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'schedule'
-                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Schedule
-          </button>
-
-          <button
-            onClick={() =>
-              setActiveTab('depth-chart')
-            }
-            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'depth-chart'
-                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Depth Chart
-          </button>
-
-          <button
-            onClick={() =>
-              setActiveTab('matchup-editor')
-            }
-            className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-sm font-semibold transition ${
-              activeTab === 'matchup-editor'
-                ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-950/40'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Matchup Editor
-          </button>
-        </div>
-
-        {/* ROSTER */}
+    <div className="min-h-screen font-sans text-slate-900 pb-12 pt-4">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 space-y-6">
+        {/* ROSTER TAB */}
         {activeTab === 'roster' && (
           <>
-            <div className="glass-panel flex flex-col items-center justify-between gap-4 rounded-2xl p-4 md:flex-row">
-              <div className="flex flex-wrap items-center gap-1">
-                {POSITIONS.map(
-                  (position) => (
-                    <button
-                      key={position}
-                      onClick={() =>
-                        setSelectedPosition(
-                          position
-                        )
-                      }
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
-                        selectedPosition ===
-                        position
-                          ? 'border-blue-400/30 bg-blue-500/20 text-blue-100 shadow-sm shadow-blue-950/30'
-                          : 'border-transparent bg-white/[0.04] text-slate-400 hover:border-white/10 hover:bg-white/[0.08] hover:text-slate-100'
-                      }`}
-                    >
-                      {position}
-                    </button>
-                  )
-                )}
+            <div className="bg-white flex flex-col items-center justify-between gap-4 rounded-2xl p-4 border border-slate-200 shadow-sm md:flex-row">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {POSITIONS.map((position) => (
+                  <button
+                    key={position}
+                    onClick={() => setSelectedPosition(position)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                      selectedPosition === position
+                        ? 'border-blue-800 bg-blue-800 text-white shadow-sm'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    {position}
+                  </button>
+                ))}
               </div>
 
               <div className="flex w-full items-center gap-3 md:w-auto">
-                <div className="flex items-center rounded-lg border border-white/10 bg-white/[0.04] p-1">
+                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-1">
                   <button
-                    onClick={() =>
-                      handleSortToggle(
-                        'number'
-                      )
-                    }
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                      sortBy ===
-                      'number'
-                        ? 'bg-blue-500/20 text-blue-300'
-                        : 'text-slate-400 hover:text-white'
+                    onClick={() => handleSortToggle('number')}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                      sortBy === 'number'
+                        ? 'bg-blue-800 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    # {sortBy ===
-                      'number' &&
-                      (sortOrder ===
-                      'asc'
-                        ? '↑'
-                        : '↓')}
+                    # {sortBy === 'number' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </button>
 
                   <button
-                    onClick={() =>
-                      handleSortToggle(
-                        'name'
-                      )
-                    }
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                      sortBy ===
-                      'name'
-                        ? 'bg-blue-500/20 text-blue-300'
-                        : 'text-slate-400 hover:text-white'
+                    onClick={() => handleSortToggle('name')}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                      sortBy === 'name'
+                        ? 'bg-blue-800 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Name{' '}
-                    {sortBy ===
-                      'name' &&
-                      (sortOrder ===
-                      'asc'
-                        ? '↑'
-                        : '↓')}
+                    Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </button>
                 </div>
 
@@ -1814,169 +632,118 @@ export default function RosterDashboard() {
                   type="text"
                   placeholder="Search name or jersey #..."
                   value={search}
-                  onChange={(e) =>
-                    setSearch(
-                      e.target.value
-                    )
-                  }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-blue-950 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 md:w-64"
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-800 md:w-64"
                 />
               </div>
             </div>
 
-            {selectedPosition ===
-            'ALL' ? (
-              <div className="glass-panel overflow-x-auto rounded-2xl">
-                <table className="w-full border-collapse text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-700 bg-slate-950/35 font-medium text-slate-400">
-                      <th
-                        className="cursor-pointer p-4 hover:text-white"
-                        onClick={() =>
-                          handleSortToggle(
-                            'number'
-                          )
-                        }
+            <div className="bg-white overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
+              <table className="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-100 font-bold text-slate-700">
+                    <th
+                      className="cursor-pointer p-4 hover:text-slate-900"
+                      onClick={() => handleSortToggle('number')}
+                    >
+                      # {sortBy === 'number' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="cursor-pointer p-4 hover:text-slate-900"
+                      onClick={() => handleSortToggle('name')}
+                    >
+                      Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="p-4">Pos</th>
+                    <th className="p-4">Class</th>
+                    <th className="p-4">HT / WT</th>
+                    <th className="p-4">Hometown / Prev. School</th>
+                    <th className="w-72 p-4">Scouting</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {filteredPlayers.map((player) => {
+                    const isIR = isPlayerInjured(player.status);
+
+                    return (
+                      <tr
+                        key={player.id}
+                        className="transition hover:bg-slate-50"
                       >
-                        # {sortBy ===
-                          'number' &&
-                          (sortOrder ===
-                          'asc'
-                            ? '↑'
-                            : '↓')}
-                      </th>
+                        <td className="p-4 font-mono font-bold text-slate-500">
+                          #{player.number}
+                        </td>
 
-                      <th
-                        className="cursor-pointer p-4 hover:text-white"
-                        onClick={() =>
-                          handleSortToggle(
-                            'name'
-                          )
-                        }
-                      >
-                        Name{' '}
-                        {sortBy ===
-                          'name' &&
-                          (sortOrder ===
-                          'asc'
-                            ? '↑'
-                            : '↓')}
-                      </th>
+                        <td className="p-4 font-semibold">
+                          <Link
+                            href={`/player/${player.id}`}
+                            className={`transition hover:underline ${
+                              isIR ? 'text-red-700 line-through' : 'text-slate-900 hover:text-blue-800'
+                            }`}
+                          >
+                            {player.name}
+                          </Link>
+                        </td>
 
-                      <th className="p-4">
-                        Pos
-                      </th>
+                        <td className="p-4">
+                          <span className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-800">
+                            {player.position}
+                          </span>
+                        </td>
 
-                      <th className="p-4">
-                        Class
-                      </th>
+                        <td className="p-4 text-slate-600">
+                          {player.eligibility}
+                        </td>
 
-                      <th className="p-4">
-                        HT / WT
-                      </th>
+                        <td className="p-4 text-slate-600">
+                          {player.height}, {player.weight} lbs
+                        </td>
 
-                      <th className="p-4">
-                        Hometown / Prev. School
-                      </th>
-
-                      <th className="w-72 p-4">
-                        Scouting
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-slate-700/50">
-                    {filteredPlayers.map(
-                      (player) => (
-                        <tr
-                          key={
-                            player.id
-                          }
-                          className="transition hover:bg-blue-500/[0.04]"
-                        >
-                          <td className="p-4 font-mono font-bold text-slate-400">
-                            #{player.number}
-                          </td>
-
-                          <td className="p-4 font-semibold text-white">
-                            <Link
-                              href={`/player/${player.id}`}
-                              className="text-blue-400 transition hover:text-blue-300 hover:underline"
-                            >
-                              {player.name}
-                            </Link>
-                          </td>
-
-                          <td className="p-4">
-                            <span className="rounded-md border border-blue-400/15 bg-blue-500/10 px-2 py-1 text-xs font-bold text-blue-300">
-                              {player.position}
-                            </span>
-                          </td>
-
-                          <td className="p-4 text-slate-300">
-                            {player.eligibility}
-                          </td>
-
-                          <td className="p-4 text-slate-300">
-                            {player.height},{' '}
-                            {player.weight} lbs
-                          </td>
-
-                          <td className="p-4 text-xs text-slate-400">
-                            <div>
-                              {player.hometown}
+                        <td className="p-4 text-xs text-slate-500">
+                          <div className="font-medium text-slate-700">{player.hometown}</div>
+                          {player.previous_school && (
+                            <div className="text-slate-600 mt-0.5">
+                              Ex: {player.previous_school}
                             </div>
+                          )}
+                        </td>
 
-                            {player.previous_school && (
-                              <div className="text-blue-400">
-                                Ex:{' '}
-                                {
-                                  player.previous_school
-                                }
-                              </div>
-                            )}
-                          </td>
-
-                          <td className="p-4">
-                            {player.scouting_tag ? (
-                              <div>
-                                <div className="mb-1">
-                                  <span className="rounded-md border border-blue-400/20 bg-blue-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-300">
-                                    {player.scouting_tag}
-                                  </span>
-                                </div>
-
-                                {player.scouting_note && (
-                                  <p className="mt-2 text-xs leading-5 text-slate-400">
-                                    {player.scouting_note}
-                                  </p>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-slate-600">
-                                —
+                        <td className="p-4">
+                          {isIR && (
+                            <span className="mb-1 inline-block rounded-md border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-800">
+                              {player.status || 'IR - OUT'}
+                            </span>
+                          )}
+                          {player.scouting_tag && !isIR && (
+                            <div className="mb-1">
+                              <span className="rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                                {player.scouting_tag}
                               </span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              renderPositionEditor(
-                selectedPosition
-              )
-            )}
+                            </div>
+                          )}
+                          {(player.injury_note || player.scouting_note) ? (
+                            <p className="mt-1 text-xs leading-5 text-slate-600">
+                              {player.injury_note || player.scouting_note}
+                            </p>
+                          ) : (
+                            !isIR && <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
 
-        {/* COACHING STAFF */}
+        {/* COACHING STAFF TAB */}
         {activeTab === 'coaching' && (
           <div className="space-y-6">
-            <div className="glass-panel flex flex-col items-start justify-between gap-4 rounded-2xl p-4 sm:flex-row sm:items-center">
-              <h2 className="text-lg font-semibold text-white">
+            <div className="bg-white flex flex-col items-start justify-between gap-4 rounded-2xl p-4 border border-slate-200 shadow-sm sm:flex-row sm:items-center">
+              <h2 className="text-lg font-bold text-slate-900">
                 Coaching & Support Personnel
               </h2>
 
@@ -1984,166 +751,103 @@ export default function RosterDashboard() {
                 type="text"
                 placeholder="Search staff or title..."
                 value={search}
-                onChange={(event) =>
-                  setSearch(
-                    event.target.value
-                  )
-                }
-                className="dark-field w-full px-4 py-2.5 text-sm md:w-64"
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-800 focus:outline-none focus:ring-1 focus:ring-blue-800 md:w-64"
               />
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredStaff.map(
-                (member) => (
-                  <div
-                    key={
-                      member.id
-                    }
-                    className="glass-panel flex flex-col justify-between rounded-2xl p-5 transition hover:-translate-y-1 hover:border-blue-400/40"
-                  >
-                    <div>
-                      <h3 className="mb-1 text-lg font-bold text-white">
-                        {member.name}
-                      </h3>
-
-                      <p className="text-sm font-medium text-blue-400">
-                        {member.title}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-between border-t border-slate-700/50 pt-3 text-xs text-slate-500">
-                      <span>
-                        Staff ID: #
-                        {member.id}
-                      </span>
-
-                      <span className="text-slate-400">
-                        Football Operations
-                      </span>
-                    </div>
+              {filteredStaff.map((member) => (
+                <div
+                  key={member.id}
+                  className="bg-white border border-slate-200 shadow-sm flex flex-col justify-between rounded-2xl p-5 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                >
+                  <div>
+                    <h3 className="mb-1 text-lg font-bold text-slate-900">
+                      {member.name}
+                    </h3>
+                    <p className="text-sm font-semibold text-slate-600">
+                      {member.title}
+                    </p>
                   </div>
-                )
-              )}
+
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+                    <span>Staff ID: #{member.id}</span>
+                    <span className="font-medium text-slate-600">Football Operations</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* SCHEDULE */}
+        {/* SCHEDULE TAB */}
         {activeTab === 'schedule' && (
-          <div className="glass-panel overflow-x-auto rounded-2xl p-6">
+          <div className="bg-white overflow-x-auto rounded-2xl p-6 border border-slate-200 shadow-sm">
             <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white">
+                <h2 className="text-lg font-bold text-slate-900">
                   2026 Season Schedule
                 </h2>
-
-                <p className="mt-1 text-sm text-slate-400">
-                  Select any game to view the full matchup
-                  breakdown.
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Select any matchup to view game breakdown.
                 </p>
               </div>
-
-              <button
-                onClick={() =>
-                  setActiveTab(
-                    'matchup-editor'
-                  )
-                }
-                className="rounded-lg border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-300 transition hover:bg-blue-500/20"
-              >
-                Edit Matchups
-              </button>
             </div>
 
             <table className="w-full border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-700 bg-slate-950/35 font-medium text-slate-400">
-                  <th className="p-3">
-                    Date
-                  </th>
-
-                  <th className="p-3">
-                    Time
-                  </th>
-
-                  <th className="p-3">
-                    Opponent
-                  </th>
-
-                  <th className="p-3">
-                    Location
-                  </th>
-
-                  <th className="p-3">
-                    Notes
-                  </th>
+                <tr className="border-b border-slate-200 bg-slate-100 font-bold text-slate-700">
+                  <th className="p-3">Date</th>
+                  <th className="p-3">Time</th>
+                  <th className="p-3">Opponent</th>
+                  <th className="p-3">Location</th>
+                  <th className="p-3">Notes</th>
+                  <th className="p-3 text-right">Action</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-700/50">
-                {schedule.map(
-                  (game) => (
-                    <tr
-                      key={
-                        game.id
-                      }
-                      className="group transition hover:bg-blue-500/[0.06]"
-                    >
-                      <td className="p-0">
-                        <Link
-                          href={`/matchup/${game.id}`}
-                          className="block p-3 font-mono font-bold text-blue-400"
-                        >
-                          {game.date}
-                        </Link>
-                      </td>
-
-                      <td className="p-0">
-                        <Link
-                          href={`/matchup/${game.id}`}
-                          className="block p-3 text-slate-300"
-                        >
-                          {game.time
-                            ? game.time.slice(
-                                0,
-                                5
-                              )
-                            : 'TBD'}
-                        </Link>
-                      </td>
-
-                      <td className="p-0">
-                        <Link
-                          href={`/matchup/${game.id}`}
-                          className="block p-3 font-semibold text-blue-400 transition group-hover:text-blue-300 group-hover:underline"
-                        >
-                          {game.opponent}
-                        </Link>
-                      </td>
-
-                      <td className="p-0">
-                        <Link
-                          href={`/matchup/${game.id}`}
-                          className="block p-3 text-slate-300"
-                        >
-                          {game.location ||
-                            'TBD'}
-                        </Link>
-                      </td>
-
-                      <td className="p-0">
-                        <Link
-                          href={`/matchup/${game.id}`}
-                          className="block p-3 text-xs italic text-slate-400"
-                        >
-                          {game.note ||
-                            '—'}
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                )}
+              <tbody className="divide-y divide-slate-100">
+                {schedule.map((game) => (
+                  <tr
+                    key={game.id}
+                    className="group transition hover:bg-slate-50 cursor-pointer"
+                  >
+                    <td className="p-3 font-mono font-medium text-slate-700">
+                      <Link href={`/matchup/${game.id}`} className="block w-full">
+                        {game.date}
+                      </Link>
+                    </td>
+                    <td className="p-3 text-slate-600">
+                      <Link href={`/matchup/${game.id}`} className="block w-full">
+                        {game.time ? game.time.slice(0, 5) : 'TBD'}
+                      </Link>
+                    </td>
+                    <td className="p-3 font-semibold text-slate-900 group-hover:text-blue-800 group-hover:underline">
+                      <Link href={`/matchup/${game.id}`} className="block w-full">
+                        {game.opponent}
+                      </Link>
+                    </td>
+                    <td className="p-3 text-slate-600">
+                      <Link href={`/matchup/${game.id}`} className="block w-full">
+                        {game.location || 'TBD'}
+                      </Link>
+                    </td>
+                    <td className="p-3 text-xs italic text-slate-500">
+                      <Link href={`/matchup/${game.id}`} className="block w-full">
+                        {game.note || '—'}
+                      </Link>
+                    </td>
+                    <td className="p-3 text-right">
+                      <Link
+                        href={`/matchup/${game.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
+                      >
+                        View Breakdown →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
 
@@ -2155,14 +859,41 @@ export default function RosterDashboard() {
           </div>
         )}
 
-        {/* DEPTH CHART */}
-        {activeTab === 'depth-chart' &&
-          renderDepthChart()}
+        {/* DEPTH CHART TAB */}
+        {activeTab === 'depth-chart' && renderDepthChart()}
 
-        {/* MATCHUP EDITOR */}
-        {activeTab === 'matchup-editor' &&
-          renderMatchupEditor()}
+        {/* INJURY REPORT TAB */}
+        {activeTab === 'injury-report' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900">
+                Official Injury & Availability Report
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Current student-athletes unavailable or on Injured Reserve (IR)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {injuredPlayers.map((player) => renderPlayerCard(player))}
+            </div>
+
+            {injuredPlayers.length === 0 && (
+              <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center text-slate-500 font-medium">
+                No players currently listed on the availability or injury report.
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
+  );
+}
+
+export default function RosterDashboard() {
+  return (
+    <Suspense fallback={<div className="p-8 text-slate-500 font-medium">Loading dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
